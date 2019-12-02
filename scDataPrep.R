@@ -75,7 +75,9 @@ if (scImpFlag) {
 	suppressMessages(library(scImpute))
 	proCtsCsv = paste(expDirPre, "raw_counts.csv", sep = "")
 	write.csv(proCtsDf, file = proCtsCsv)
-	scimpute(count_path = proCtsCsv, infile = "csv", outfile = "csv", out_dir = dataDir,
+	scImpOutDir = paste(dataDir, expID, sep = "")
+	dir.create(file.path(dataDir, expID), showWarnings = TRUE)
+	scimpute(count_path = proCtsCsv, infile = "csv", outfile = "csv", out_dir = scImpOutDir,
 		 Kcluster = 5, ncores = 12)
 	print(Sys.time()-st)
 }
