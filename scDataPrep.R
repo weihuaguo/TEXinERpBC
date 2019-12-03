@@ -18,8 +18,9 @@ cellAnnFile = "04252019_flow_ann_tissue_only.csv" # RAW
 
 extractFlag = TRUE
 saveExtract = TRUE
-tisOi = c("Tumor", "LN")
-tisOiStr = paste(tisOi, collapse = "_")
+tisOi = c("Tumor", "LN", "Normal", "PBMC")
+nKclust = 5
+tisOiStr = paste(c(tisOi,"scImpute", nKclust), collapse = "_")
 dir.create(file.path(dataDir, tisOiStr), showWarnings = TRUE)
 expDir = paste(dataDir, tisOiStr, "/", sep = "")
 
