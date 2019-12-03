@@ -13,14 +13,17 @@ suppressMessages(library(stringr))
 dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/"
 rawCtsFile = "04222019_wta_all_merged_v5_cleaned.txt" # RAW
 cellAnnFile = "04252019_flow_ann_tissue_only.csv" # RAW
-resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults/"
+# resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults/"
 
-expID = "tumor_ln_test"
-dir.create(file.path(resDir, expID), showWarnings = TRUE)
-expDirPre = paste(resDir, expID, "/", expID, "_", sep = "")
 
 extractFlag = TRUE
+saveExtract = TRUE
 tisOi = c("Tumor", "LN")
+tisOiStr = paste(tisOi, collapse = "_")
+dir.create(file.path(dataDir, tisOiStr), showWarnings = TRUE)
+expDir = paste(dataDir, tisOiStr, "/", sep = "")
+
+
 
 scImpFlag = TRUE
 
@@ -52,12 +55,12 @@ if (extractFlag) {
 	# Add plate and cell column NOTE: REPLACE DOT is a nightmare!!
 	selectCellAnn$plate = str_split_fixed(rownames(selectCellAnn), "\\.", n = 2)[,1]
 	proCtsDf = rawCtsDf[,rownames(selectCellAnn)]
-	if (FALSE) {
-		tisOiStr = paste(tisOi, collapse = "_")
+	tisOiStr = paste(tisOi, collapse = "_")
+	if (saveExtract) {
 		write.table(selectCellAnn, 
-			    paste(dataDir, tisOiStr, "_cell_annotation.txt", sep = ""))
+			    paste(expDir, tisOiStr, "_cell_annotation.txt", sep = ""))
 		write.table(proCtsDf,
-			    paste(dataDir, tisOiStr, "_extracted_raw_counts.txt", sep = ""))
+			    paste(expDir, tisOiStr, "_extracted_raw_counts.txt", sep = ""))
 	}
 	print(dim(proCtsDf))
 
@@ -73,11 +76,8 @@ if (scImpFlag) {
 	st = Sys.time()
 	cat("Start to impute with scImpute...\n")
 	suppressMessages(library(scImpute))
-	proCtsCsv = paste(expDirPre, "raw_counts.csv", sep = "")
-	write.csv(proCtsDf, file = proCtsCsv)
-	scImpOutDir = paste(dataDir, expID, sep = "")
-	dir.create(file.path(dataDir, expID), showWarnings = TRUE)
-	scimpute(count_path = proCtsCsv, infile = "csv", outfile = "csv", out_dir = scImpOutDir,
+	proCtsTxt = paste(expDir, tisOiStr, "_extracted_raw_counts.txt", sep = "")
+	scimpute(count_path = proCtsTxt, infile = "txt", outfile = "txt", out_dir = expDir,
 		 Kcluster = 5, ncores = 12)
 	print(Sys.time()-st)
 }
