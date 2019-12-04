@@ -9,16 +9,21 @@ suppressMessages(library(Seurat))
 suppressMessages(library(ggplot2))
 suppressMessages(library(dplyr))
 
-dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/"
-ctsFile = "Tumor_LN_extracted_raw_counts.txt"
+dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_scImpute_5/"
+# ctsFile = "Tumor_LN_extracted_raw_counts.txt"
+ctsFile = "scimpute_count.txt"
 cellAnnFile = "Tumor_LN_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
 
-expID = "tumor_ln_wo_scimp_ndim_10"
+expID = "tumor_ln_scimp_k5_rmkeep_proenc_ndim_15"
+mtThr = 20
+rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
+keepFlag = TRUE # TRUE: only use characterized protein-encoding genes
 tifres = 180
-ndim = 10
-jsFlag = FALSE
+ndim = 15
+nFeat = 1000
+jsFlag = TRUE
 dir.create(file.path(resDir, expID), showWarnings = TRUE)
 expDirPre = paste(resDir, "/", expID, "/", expID, "_", sep = "")
 
@@ -27,7 +32,6 @@ expDirPre = paste(resDir, "/", expID, "/", expID, "_", sep = "")
 git_scfolder = "/home/weihua/git_repo/TEXinERpBC"
 rscript_file = list.files(git_scfolder, "scProcess.R")
 file.copy(rscript_file, paste(resDir, "/", expID, "/", sep = ""))
-
 
 cat("Start to read counts...\n")
 ctsDf = read.table(paste(dataDir, ctsFile, sep = ""), header = TRUE, row.names = 1, sep = " ")
@@ -48,12 +52,59 @@ qcComb = CombinePlots(plots = list(plot1, plot2))
 ggsave(plot = qcComb, filename = paste(expDirPre, "QC_Correlation_2.tiff", sep = ""), 
        width = 12, height = 6, dpi = tifres)
 
-# NOTE: Key QC step to remove low quality cells
-srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+ctsData = srsc[["RNA"]]@data
+metaData = srsc@meta.data[,c("plate", "tissue")]
+
+if (rmFlag) {
+	cat("Remove the non-informative genes (ribosomal or mitochondrial genes...)\n")
+	# NOTE: Key QC step to remove dead or dying cells
+	srsc = subset(srsc, subset = percent.mt < 20)
+	##########################################################################
+	# Pre_filter
+	rmGeneFile = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/remove_list.txt"
+	rmGenes = scan(rmGeneFile, what="", sep="\n", quiet = TRUE)
+	
+	olRmGenes = intersect(rownames(ctsData), rmGenes)
+	keepGenes = setdiff(rownames(ctsData), olRmGenes)
+	cleanCtsData = ctsData[keepGenes,]
+	
+	srsc = CreateSeuratObject(counts = cleanCtsData, project = expID, min.cells = 3, min.features = 200, 
+				  meta.data = metaData)
+	srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500)
+} else {
+	# NOTE: Key QC step to remove low quality cells
+	srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+}
+
+if (keepFlag) {
+	cat("Only keep the characterized protein-encoding genes for further analysis...\n")
+	# NOTE: Key QC step to remove dead or dying cells
+	if (!rmFlag) {
+		srsc = subset(srsc, subset = percent.mt < 20)
+	} else {
+		ctsData = srsc[["RNA"]]@data
+		metaData = srsc@meta.data[,c("plate", "tissue")]
+	}
+	##########################################################################
+	# Pre_filter
+	kpGeneFile = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/keep_protein_coding_gene.txt"
+	kpGenes = scan(kpGeneFile, what="", sep="\n", quiet = TRUE)
+	
+	olKPGenes = intersect(rownames(ctsData), kpGenes)
+	cleanCtsData = ctsData[olKPGenes,]
+	
+	srsc = CreateSeuratObject(counts = cleanCtsData, project = expID, min.cells = 3, min.features = 200, 
+				  meta.data = metaData)
+	srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500)
+} else {
+	# NOTE: Key QC step to remove low quality cells
+	srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
+}
+
 # NOTE: Normalization
 srsc = NormalizeData(srsc, normalization.method = "LogNormalize", scale.factor = 10000)
 # NOTE: Identify highly variable features
-srsc = FindVariableFeatures(srsc, selection.method = "vst", nfeatures = 2000)
+srsc = FindVariableFeatures(srsc, selection.method = "vst", nfeatures = 1000)
 topVarGene = head(VariableFeatures(srsc), 18)
 plot1 = VariableFeaturePlot(srsc)
 plot2 = LabelPoints(plot = plot1, points = topVarGene, repel = TRUE)
