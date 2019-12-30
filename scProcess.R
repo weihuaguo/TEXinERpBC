@@ -9,14 +9,14 @@ suppressMessages(library(Seurat))
 suppressMessages(library(ggplot2))
 suppressMessages(library(dplyr))
 
-dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_scImpute_5/"
+dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_Normal_PBMC_scImpute_5/"
 # ctsFile = "Tumor_LN_extracted_raw_counts.txt"
 ctsFile = "scimpute_count.txt"
-cellAnnFile = "Tumor_LN_cell_annotation.txt"
+cellAnnFile = "Tumor_LN_Normal_PBMC_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
 
-expID = "tumor_ln_scimp_k5_rmkeep_proenc_custMT_ndim_9"
+expID = "tumor_ln_normal_pbmc_scimp_k5_rmkeep_proenc_custMT_ndim_9"
 mtThr = 20
 custMTGeneFlag = TRUE # TRUE: use manually refined mitochondrial genes to calculate percent_mt
 rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
@@ -48,7 +48,6 @@ if (custMTGeneFlag) {
 	mtGeneFile = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/mt_gene_list.txt"
 	mtGenes = scan(mtGeneFile, what="", sep="\n", quiet = TRUE)
 	avaMTGenes = intersect(rownames(srsc[["RNA"]]@data), mtGenes)
-	print(avaMTGenes)
 	srsc[["percent.mt"]] = PercentageFeatureSet(srsc, features = avaMTGenes)
 } else {
 	cat("Use genes starting with MT- to calculate percentage of mitochondrial gene expression\n")
@@ -66,6 +65,8 @@ ggsave(plot = qcComb, filename = paste(expDirPre, "QC_Correlation_2.tiff", sep =
 
 ctsData = srsc[["RNA"]]@data
 metaData = srsc@meta.data[,c("plate", "tissue")]
+# print(head(srsc@meta.data))
+# stop("Test")
 
 if (rmFlag) {
 	cat("Remove the non-informative genes (ribosomal or mitochondrial genes...)\n")
@@ -162,7 +163,7 @@ srsc = FindClusters(srsc, resolution = 0.5) # NOTE: higher resolution, more clus
 
 # NOTE: further dimension reduction
 srsc = RunUMAP(srsc, dims = 1:ndim)
-srsc = RunTSNE(srsc, dims = 1:ndim, tsne.method = "Rtsne")
+srsc = RunTSNE(srsc, dims = 1:ndim, tsne.method = "Rtsne", check_duplicates = FALSE)
 
 umapDim = DimPlot(srsc, reduction = "umap")
 ggsave(plot = umapDim, filename = paste(expDirPre, "UMAP.tiff", sep = ""), 
