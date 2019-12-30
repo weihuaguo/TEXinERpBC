@@ -9,20 +9,19 @@ suppressMessages(library(Seurat))
 suppressMessages(library(ggplot2))
 suppressMessages(library(dplyr))
 
-dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_Normal_PBMC_scImpute_5/"
+dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_Colorectal_Melanoma_scImpute_5/"
 # ctsFile = "Tumor_LN_extracted_raw_counts.txt"
 ctsFile = "scimpute_count.txt"
-cellAnnFile = "Tumor_LN_Normal_PBMC_cell_annotation.txt"
+cellAnnFile = "Tumor_Colorectal_Melanoma_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
-
-expID = "tumor_ln_normal_pbmc_scimp_k5_rmkeep_proenc_custMT_ndim_9"
+expID = "tumor_crc_melanoma_scimp_k5_rmkeep_proenc_custMT_ndim_10"
 mtThr = 20
 custMTGeneFlag = TRUE # TRUE: use manually refined mitochondrial genes to calculate percent_mt
 rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
 keepFlag = TRUE # TRUE: only use characterized protein-encoding genes
 tifres = 180
-ndim = 9
+ndim = 10
 nFeat = 1000
 jsFlag = TRUE
 dir.create(file.path(resDir, expID), showWarnings = TRUE)
