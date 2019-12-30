@@ -16,12 +16,13 @@ cellAnnFile = "Tumor_LN_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
 
-expID = "tumor_ln_scimp_k5_rmkeep_proenc_ndim_15"
+expID = "tumor_ln_scimp_k5_rmkeep_proenc_custMT_ndim_9"
 mtThr = 20
+custMTGeneFlag = TRUE # TRUE: use manually refined mitochondrial genes to calculate percent_mt
 rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
 keepFlag = TRUE # TRUE: only use characterized protein-encoding genes
 tifres = 180
-ndim = 15
+ndim = 9
 nFeat = 1000
 jsFlag = TRUE
 dir.create(file.path(resDir, expID), showWarnings = TRUE)
@@ -42,7 +43,18 @@ srsc@meta.data$tissue = as.factor(cellAnnDf[rownames(srsc@meta.data), "tissue"])
 srsc@meta.data$plate = as.factor(cellAnnDf[rownames(srsc@meta.data), "plate"])
 print(head(srsc@meta.data))
 
-srsc[["percent.mt"]] = PercentageFeatureSet(srsc, pattern = "^MT-")
+if (custMTGeneFlag) {
+	cat("Use manually refined mitochondrial gene list to calculate percentage of mitochondrial gene expression\n")
+	mtGeneFile = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/mt_gene_list.txt"
+	mtGenes = scan(mtGeneFile, what="", sep="\n", quiet = TRUE)
+	avaMTGenes = intersect(rownames(srsc[["RNA"]]@data), mtGenes)
+	print(avaMTGenes)
+	srsc[["percent.mt"]] = PercentageFeatureSet(srsc, features = avaMTGenes)
+} else {
+	cat("Use genes starting with MT- to calculate percentage of mitochondrial gene expression\n")
+	srsc[["percent.mt"]] = PercentageFeatureSet(srsc, pattern = "^MT-")
+}
+
 qcVln = VlnPlot(srsc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
 ggsave(plot = qcVln, filename = paste(expDirPre, "QC_Vln_1.tiff", sep = ""), width = 9, height = 6, dpi = tifres)
 
