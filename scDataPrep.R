@@ -1,6 +1,7 @@
 # scDataPrep.R
 # Weihua Guo, Ph.D.
-# Start at 12/02/2019
+# Start date: 12/02/2019
+# Check date 1: 12/30/2019
 # Functions:
 # 1) Read raw count matrix with cell annotation
 # 2) Extract the cells of interest
