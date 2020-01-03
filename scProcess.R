@@ -9,13 +9,14 @@ suppressMessages(library(Seurat))
 suppressMessages(library(ggplot2))
 suppressMessages(library(dplyr))
 
-dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_Colorectal_Melanoma_scImpute_5/"
+dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_scImpute_5/"
 # ctsFile = "Tumor_LN_extracted_raw_counts.txt"
 ctsFile = "scimpute_count.txt"
-cellAnnFile = "Tumor_Colorectal_Melanoma_cell_annotation.txt"
+cellAnnFile = "Tumor_LN_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
-expID = "tumor_crc_melanoma_scimp_k5_rmkeep_proenc_custMT_ndim_10"
+# expID = "tumor_crc_melanoma_scimp_k5_rmkeep_proenc_custMT_ndim_10"
+expID = "clean_up_tests"
 mtThr = 20
 custMTGeneFlag = TRUE # TRUE: use manually refined mitochondrial genes to calculate percent_mt
 rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
@@ -40,7 +41,9 @@ cellAnnDf = read.table(paste(dataDir, cellAnnFile, sep = ""), header = TRUE, row
 srsc = CreateSeuratObject(counts = ctsDf, project = expID, min.cells = 3, min.features = 200)
 srsc@meta.data$tissue = as.factor(cellAnnDf[rownames(srsc@meta.data), "tissue"])
 srsc@meta.data$plate = as.factor(cellAnnDf[rownames(srsc@meta.data), "plate"])
-print(head(srsc@meta.data))
+cat("Raw Seurat Object:")
+print(srsc)
+# print(head(srsc@meta.data))
 
 if (custMTGeneFlag) {
 	cat("Use manually refined mitochondrial gene list to calculate percentage of mitochondrial gene expression\n")
@@ -64,8 +67,6 @@ ggsave(plot = qcComb, filename = paste(expDirPre, "QC_Correlation_2.tiff", sep =
 
 ctsData = srsc[["RNA"]]@data
 metaData = srsc@meta.data[,c("plate", "tissue")]
-# print(head(srsc@meta.data))
-# stop("Test")
 
 if (rmFlag) {
 	cat("Remove the non-informative genes (ribosomal or mitochondrial genes...)\n")
@@ -113,6 +114,9 @@ if (keepFlag) {
 	srsc = subset(srsc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 20)
 }
 
+cat("After data clean:")
+print(srsc)
+stop("Test")
 # NOTE: Normalization
 srsc = NormalizeData(srsc, normalization.method = "LogNormalize", scale.factor = 10000)
 # NOTE: Identify highly variable features
