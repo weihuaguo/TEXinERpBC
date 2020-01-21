@@ -1,6 +1,7 @@
 # Single-cell RNA sequencing data standard processing procedure
 # Weihua Guo, Ph.D.
 # Start date: 12/02/2019
+# NOTE: 01/21/2018 Add cell filter function here
 # Functions: https://satijalab.org/seurat/v3.1/pbmc3k_tutorial.html
 
 rm(list = ls())
@@ -9,20 +10,21 @@ suppressMessages(library(Seurat))
 suppressMessages(library(ggplot2))
 suppressMessages(library(dplyr))
 
-dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_scImpute_5/"
+dataDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/scRNAseqTex/Tumor_LN_Normal_PBMC_Colorectal_Melanoma_scImpute_5/"
 # ctsFile = "Tumor_LN_extracted_raw_counts.txt"
 ctsFile = "scimpute_count.txt"
-cellAnnFile = "Tumor_LN_cell_annotation.txt"
+cellAnnFile = "Tumor_LN_Normal_PBMC_Colorectal_Melanoma_cell_annotation.txt"
 resDir = "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults"
 
 # expID = "tumor_crc_melanoma_scimp_k5_rmkeep_proenc_custMT_ndim_10"
-expID = "clean_up_tests"
+expID = "new_scimpute_breast_tissue_only"
+tisFilter = c("Tumor", "Normal", "LN", "PBMC")
 mtThr = 20
 custMTGeneFlag = TRUE # TRUE: use manually refined mitochondrial genes to calculate percent_mt
 rmFlag = TRUE # TRUE: remove ribosome genes and mitochondrial genes
 keepFlag = TRUE # TRUE: only use characterized protein-encoding genes
 tifres = 180
-ndim = 10
+ndim = 12
 nFeat = 1000
 jsFlag = TRUE
 dir.create(file.path(resDir, expID), showWarnings = TRUE)
@@ -36,10 +38,31 @@ file.copy(rscript_file, paste(resDir, "/", expID, "/", sep = ""))
 
 cat("Start to read counts...\n")
 ctsDf = read.table(paste(dataDir, ctsFile, sep = ""), header = TRUE, row.names = 1, sep = " ")
-cellAnnDf = read.table(paste(dataDir, cellAnnFile, sep = ""), header = TRUE, row.names = 1, sep = " ")
+cellAnnDf = read.table(paste(dataDir, cellAnnFile, sep = ""), header = TRUE, row.names = 1, sep = " ",
+		       stringsAsFactors = FALSE)
+
+## TODO: move this out side finally!!!
+if (is.null(tisFilter)) {
+	cat("Use all the tissue:", unique(cellAnnDf$tissue),"\n")
+	cellAnnDf = cellAnnDf[complete.cases(cellAnnDf$tissue),]
+	ctsDf = ctsDf[,colnames(ctsDf) %in% rownames(cellAnnDf)]
+	ctsDf = ctsDf[,rownames(cellAnnDf)]
+} else {
+	cat("Only use the following tissue:", tisFilter, "\n")
+	cellAnnDf = cellAnnDf[complete.cases(cellAnnDf$tissue),]
+	cellAnnDf = cellAnnDf[cellAnnDf$tissue %in% tisFilter,]
+	ctsDf = ctsDf[,colnames(ctsDf) %in% rownames(cellAnnDf)]
+	ctsDf = ctsDf[,rownames(cellAnnDf)]
+}
+
+print(head(cellAnnDf))
+print(ctsDf[1:9,1:6])
+print(dim(cellAnnDf))
+print(dim(ctsDf))
 
 srsc = CreateSeuratObject(counts = ctsDf, project = expID, min.cells = 3, min.features = 200)
-srsc@meta.data$tissue = as.factor(cellAnnDf[rownames(srsc@meta.data), "tissue"])
+# NOTE: before adding meta.data, align the rows of meta.data to ctsDf is NECCESSARY
+srsc@meta.data$tissue = as.factor(cellAnnDf[rownames(srsc@meta.data), "tissue"]) 
 srsc@meta.data$plate = as.factor(cellAnnDf[rownames(srsc@meta.data), "plate"])
 cat("Raw Seurat Object:")
 print(srsc)
@@ -116,7 +139,6 @@ if (keepFlag) {
 
 cat("After data clean:")
 print(srsc)
-stop("Test")
 # NOTE: Normalization
 srsc = NormalizeData(srsc, normalization.method = "LogNormalize", scale.factor = 10000)
 # NOTE: Identify highly variable features
