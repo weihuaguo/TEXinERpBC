@@ -11,28 +11,15 @@ library(dplyr)
 library(Seurat)
 library(tcltk)
 
-# tenx_dir: directory storing 10X data (3 matrices)
-sample_id <- "trm_tex_brtissue_only" # Sample ID, define the input sample COLT
-# sample_id <- "bc6_gse114725_raw" # LEI
-
-
-exp_id <- "trm_tex_brtissue_norm_scim_k5" # Experimental ID, a new folder with this name will be created COLT BMC: Breast, Melanoma, Colorectal
-# exp_id <- "bc6_gse114725_norm_raw" # LEI
-
-
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04222019_wta_all_merged_v5_cleaned.txt"
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/dca_output_dorate_10/mean.tsv"
+exp_id <- "tex_brtissue_scim_k5_res45" # Experimental ID, a new folder with this name will be created
+sample_id <- exp_id
+# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04222019_wta_all_merged_v5_cleaned.txt" # Before imputation
 input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/trm_tex_bd/trm_tex_scim_k5/imputation_res/scimpute_count.csv"
 
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/bc389_tmr/10x_files_v2" # LEI
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/bc375_tmr/filtered_gene_bc_matrices/hg19" #LEI
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/tam/bc377_tam_filtered_norm/tam_monocyte_raw_counts_bc377.csv" #LEI
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/comb4_tam_c3_no_norm_subset.rds" #LEI
-# input_dir <- "/home/weihua/mnts/group_plee/Weihua/public_data/scrnaseq/GSE114725_rna_raw_bc6_lumA_tumor.csv" #LEI
+select_file <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04252019_flow_ann_tissue_only.csv"
+meta_file <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/01222020_flow_ann_all_merged_v2.txt"
+main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults/"
 
-select_file <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04252019_flow_ann_tissue_only.csv" #COLT
-main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults/" # COLT
-# main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/tam/"
 dir.create(file.path(main_res_dir, exp_id), showWarnings = TRUE)
 res_dir <- paste(c(main_res_dir, exp_id, "/"),collapse="")
 
@@ -51,7 +38,6 @@ rscript_file <- list.files(git_scfolder, "seurat_upplat_v1.r")
 file.copy(rscript_file, res_dir)
 
 # PARAMETER SECTION!!!
-input_type <- "mat" # mat: read from matrices "mat": matrix, "10X": 10X folder, "rds": rda files
 selfil <- TRUE # TRUE: will filter by some values from select_file
 fil_items <- c("Tumor","Normal","LN","PBMC") # Breast only
 # fil_items <- c("Tumor","Melanoma","Colorectal")
@@ -66,9 +52,9 @@ default_assay <- "RNA" # Default assay name
 mat_sep <- "," # Separator for input matrix file
 low_rna_thr <- 200 # If the cell has less than this number of genes, it will be removed
 up_rna_thr <- 2500 # If the cell has more than this number of genes, it will be removed
-norm_flag <- TRUE # TRUE: run NormalizeData, FALSE: NOT run Normalization
 fv_thr <- 1000
 mt_pat <- "^MT."
+clRes = 0.45
 
 ############################################################################
 ## Generate a list to store the output plot names
@@ -88,29 +74,18 @@ plot_save["umap"] <- paste(c(res_dir, sample_id, "_", "umap.tif"),collapse="")
 plot_save["tsne"] <- paste(c(res_dir, sample_id, "_", "tsne.tif"),collapse="")
 plot_save["fitsne"] <- paste(c(res_dir, sample_id, "_", "fitsne.tif"),collapse="")
 
-if (input_type == "10X"){
-## Read the data from 10X outputs
-cat("Start to read 10X files...\n")
-sc.data <-Read10X(data.dir=input_dir)
-}
 
 ## Read the data from cell-expression matrix
-if (input_type == "mat") {
 cat("Start to reading the matrix...\n")
 sc.data <- read.table(file = input_dir, header = TRUE, sep = mat_sep, row.names=NULL)
 sc.data <- sc.data[!duplicated(sc.data$gene),]
 rownames(sc.data) <- sc.data$gene
-}
-
-## Read the data from RDS
-if (input_type == "rds") {
-	cat("Start to read RDS file...\n")
-srsc <- readRDS(file = input_dir)
-sc.data <- as.matrix(x = GetAssayData(object = srsc, slot = "counts"))
-}
 
 ############################################################################
 ## Filter by markers/tissues
+meta.data = read.table(file = meta_file, header = TRUE, sep = "\t", row.names=1)
+cellOi = rownames(meta.data)[meta.data$tissue %in% fil_items]
+print(length(cellOi))
 if (selfil) {
 	cat("Filter the cells based on the tissue type: \n")
 	cat("\t", paste(fil_items, sep=" "), "\n")
@@ -124,6 +99,7 @@ if (selfil) {
 	temp.seldf <- temp.fildf[temp.smask,]
 	dim(temp.seldf)
 	sel_cells <- row.names(temp.seldf)
+	print(setdiff(sel_cells, cellOi))
 	sc.data <- sc.data[,sel_cells]
 	sc.data[duplicated(sc.data$rownames),]
 	print(dim(sc.data))
@@ -143,30 +119,14 @@ if (impu_app == "sci") { # Can we do basic filter first and then do the imputati
 			      header=TRUE, sep=",",row.names=1)
 	srsc <- CreateSeuratObject(counts=sc.data, project=sample_id, min.cells=5, min.features=200)
 	print("Printing basic info of Seurat object...",quote=FALSE)
-	srsc
-	GetAssayData(object = srsc, slot = 'data')[1:3, 1:9]
+#	GetAssayData(object = srsc, slot = 'data')[1:3, 1:9]
 }
-# Let's use the original way
-if (impu_app == "alra") {
-	source('alra.R')
-	pgene <- c("PDCD1","SELL","SELO")
-	sc.data <- subset(sc.data, select=-c(gene))
-	print(sc.data[pgene,1:10])
-	norm_sc.data <- normalize_data(t(sc.data))
-	k_choice <-choose_k(norm_sc.data)
-	alra_res <- alra(norm_sc.data, k=k_choice$k)
-	print(alra_res[[1]])
-	sc.data <- alra_res[[3]]
-	print(class(sc.data))
-	srsc <- CreateSeuratObject(counts=t(sc.data), project=sample_id, min.cells=5, min.features=200)
-	# srsc <- RunALRA(object=srsc)
-	GetAssayData(object = srsc, slot = 'data')[1:3, 1:9]
-}
+
 if (impu_app == "--") {
 	srsc <- CreateSeuratObject(counts=sc.data, project=sample_id, min.cells=5, min.features=200)
-	GetAssayData(object = srsc, slot = 'data')[1:3,1:9]
+#	GetAssayData(object = srsc, slot = 'data')[1:3,1:9]
 }
-srsc
+print(srsc)
 cat(paste(c(rep("+++",33),"\n"),collapse=""),quote=FALSE)
 
 ############################################################################
@@ -209,25 +169,23 @@ clean.data <- srsc[[default_assay]]@data
 dim(clean.data)
 # Remove genes
 if (rm_flag){
-used_rm <- setdiff(cur_genes, rm_genes)
-clean.data <- clean.data[used_rm,]
-dim(clean.data)
-srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
+	used_rm <- setdiff(cur_genes, rm_genes)
+	clean.data <- clean.data[used_rm,]
+	dim(clean.data)
+	srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
 }
 # Extract genes
 if (kp_flag){
-cur_genes <- rownames(clean.data)
-used_kp <- intersect(cur_genes, kp_genes)
-clean.data <- clean.data[used_kp,]
-dim(clean.data)
-srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
+	cur_genes <- rownames(clean.data)
+	used_kp <- intersect(cur_genes, kp_genes)
+	clean.data <- clean.data[used_kp,]
+	dim(clean.data)
+	srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
 }
-print("After manual QC, basic info of Seurat object:",quote=FALSE)
-srsc
 
-if (norm_flag) {
+print("After manual QC, basic info of Seurat object:",quote=FALSE)
+
 srsc <- NormalizeData(object = srsc, normalization.method = "LogNormalize", scale.factor = 10000)
-}
 
 ## Find variable genes
 srsc <- FindVariableFeatures(object = srsc, selection.method = "vst", nfeatures = fv_thr)
@@ -276,7 +234,7 @@ garbage <- dev.off()
 
 ## Cluster the cells
 srsc <- FindNeighbors(object = srsc, dims = 1:num_dim)
-srsc <- FindClusters(object = srsc, resolution = 0.5)
+srsc <- FindClusters(object = srsc, resolution = clRes)
 
 ### Non-linear dimensional reduction!!!
 
@@ -294,6 +252,8 @@ garbage <- dev.off()
 
 # NOTE: Find cluster markers
 clusterMarkers = FindAllMarkers(srsc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+clusterMarkers$sigFlag = 0
+clusterMarkers[clusterMarkers$avg_logFC > 1 & clusterMarkers$p_val_adj <0.10, "sigFlag"] = 2
 posCsv = paste(res_dir, sample_id, "_positive_cluster_markers_only.csv", sep = "")
 write.csv(clusterMarkers, file = posCsv)
 
