@@ -31,7 +31,7 @@ input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/trm_tex_bd/tr
 # input_dir <- "/home/weihua/mnts/group_plee/Weihua/public_data/scrnaseq/GSE114725_rna_raw_bc6_lumA_tumor.csv" #LEI
 
 select_file <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04252019_flow_ann_tissue_only.csv" #COLT
-main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/trm_tex_bd/" # COLT
+main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/scRNAseqTexResults/" # COLT
 # main_res_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/tam/"
 dir.create(file.path(main_res_dir, exp_id), showWarnings = TRUE)
 res_dir <- paste(c(main_res_dir, exp_id, "/"),collapse="")
@@ -46,7 +46,7 @@ kp_genes <- scan(kp_gene_file, what="", sep="\n")
 
 ##########################################################################
 # Save this Rscript to the result folder
-git_scfolder <- "/home/weihua/git_repo/scrna_seq_pipeline"
+git_scfolder <- "/home/weihua/git_repo/TEXinERpBC/"
 rscript_file <- list.files(git_scfolder, "seurat_upplat_v1.r")
 file.copy(rscript_file, res_dir)
 
@@ -292,11 +292,15 @@ tiff(plot_save[["tsne"]], res = 360, width = 7.5, heigh = 4.5, units = 'in')
 DimPlot(object = srsc, reduction = "tsne")
 garbage <- dev.off()
 
-## FIt-SNE
-# srsc <- RunTSNE(object = srsc, dims = 1:num_dim, tsne.method = "FIt-SNE", nthreads = 12, max_item = 2000)
-# tiff(plot_save[["fitsne"]], res = 360, width = 7.5, heigh = 4.5, units = 'in')
-# DimPlot(object = srsc, reduction = "tsne")
-# garbage <- dev.off()
+# NOTE: Find cluster markers
+clusterMarkers = FindAllMarkers(srsc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+posCsv = paste(res_dir, sample_id, "_positive_cluster_markers_only.csv", sep = "")
+write.csv(clusterMarkers, file = posCsv)
+
+topMarkers = clusterMarkers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+tiff(paste(res_dir, sample_id, "_cluster_marker_heatmap.tiff", sep = ""), width = 9, height = 12, res = 300, units = 'in')
+DoHeatmap(srsc, features = topMarkers$gene)
+gar = dev.off()
 
 
 ## Save to RDS
