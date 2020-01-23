@@ -10,8 +10,9 @@ rm(list=ls())
 library(dplyr)
 library(Seurat)
 library(tcltk)
+library(ggplot2)
 
-exp_id <- "tex_brtissue_scim_k5_res45" # Experimental ID, a new folder with this name will be created
+exp_id <- "tex_brtissue_scim_k5_res45_pptest" # Experimental ID, a new folder with this name will be created
 sample_id <- exp_id
 # input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_leelab/trm_tex/04222019_wta_all_merged_v5_cleaned.txt" # Before imputation
 input_dir <- "/home/weihua/mnts/group_plee/Weihua/scrnaseq_results/trm_tex_bd/trm_tex_scim_k5/imputation_res/scimpute_count.csv"
@@ -40,7 +41,8 @@ file.copy(rscript_file, res_dir)
 # PARAMETER SECTION!!!
 selfil <- TRUE # TRUE: will filter by some values from select_file
 fil_items <- c("Tumor","Normal","LN","PBMC") # Breast only
-# fil_items <- c("Tumor","Melanoma","Colorectal")
+facs_markers <- c("CCR7", "CD39", "CD45RA", "CD69", "CD103", "CD137", "PD1")
+meta_cols <- c("tissue", "patient", "plate", "PD1CD39_Status")
 num_dim <- 12 # dim in PCA, tSNE
 mt_thr <- 20 # threshold for percentage.mito
 mt_cust <- TRUE # Use customized mitochondrial genes (mt_gene_file)
@@ -59,10 +61,10 @@ clRes = 0.45
 ############################################################################
 ## Generate a list to store the output plot names
 plot_names = c("qc1", "qc2", "var_gene", "pca_2d", "pca_hm", "pca_viz", "JSP", "elbow", 
-	       "umap", "tsne")
+	       "umap", "tsne", "batch")
 plot_save <- vector(mode = "list", length=length(plot_names))
 names(plot_save) <- plot_names
-plot_save["qc1"] <- paste(c(res_dir, sample_id, "_", "qcplot1.tif"),collapse="")
+plot_save["qc1"] <- paste(c(res_dir, sample_id, "_", "qcplot1.tiff"),collapse="")
 plot_save["qc2"] <- paste(c(res_dir, sample_id, "_", "qcplot2.tif"),collapse="")
 plot_save["var_gene"] <- paste(c(res_dir, sample_id, "_", "variable_genes.tif"),collapse="")
 plot_save["pca_2d"] <- paste(c(res_dir, sample_id, "_", "pca_2dcluster.tif"),collapse="")
@@ -72,7 +74,7 @@ plot_save["JSP"] <- paste(c(res_dir, sample_id, "_", "JackStrawPlot.tif"),collap
 plot_save["elbow"] <- paste(c(res_dir, sample_id, "_", "ElbowPlot.tif"),collapse="")
 plot_save["umap"] <- paste(c(res_dir, sample_id, "_", "umap.tif"),collapse="")
 plot_save["tsne"] <- paste(c(res_dir, sample_id, "_", "tsne.tif"),collapse="")
-plot_save["fitsne"] <- paste(c(res_dir, sample_id, "_", "fitsne.tif"),collapse="")
+plot_save["batch"] <- paste(c(res_dir, sample_id, "_", "batch_effect_check.tiff"),collapse="")
 
 
 ## Read the data from cell-expression matrix
@@ -84,23 +86,24 @@ rownames(sc.data) <- sc.data$gene
 ############################################################################
 ## Filter by markers/tissues
 meta.data = read.table(file = meta_file, header = TRUE, sep = "\t", row.names=1)
-cellOi = rownames(meta.data)[meta.data$tissue %in% fil_items]
-print(length(cellOi))
 if (selfil) {
 	cat("Filter the cells based on the tissue type: \n")
 	cat("\t", paste(fil_items, sep=" "), "\n")
-	sc.filter <- read.table(file = select_file, header=TRUE, sep=",",row.names=1)
-	temp.fildf <- as.data.frame(t(sc.filter))
-	temp.mask <- temp.fildf[,fil_items] == 1
-	temp.sum <- apply(temp.mask,1,sum)
-	temp.smask <- temp.sum == 1
-	cat("Selected cell numbers: ",sum(temp.sum),"\n")
-	print(head(temp.sum))
-	temp.seldf <- temp.fildf[temp.smask,]
-	dim(temp.seldf)
-	sel_cells <- row.names(temp.seldf)
-	print(setdiff(sel_cells, cellOi))
-	sc.data <- sc.data[,sel_cells]
+	cell_oi = rownames(meta.data)[meta.data$tissue %in% fil_items]
+	print(length(cell_oi))
+
+#	sc.filter <- read.table(file = select_file, header=TRUE, sep=",",row.names=1)
+#	temp.fildf <- as.data.frame(t(sc.filter))
+#	temp.mask <- temp.fildf[,fil_items] == 1
+#	temp.sum <- apply(temp.mask,1,sum)
+#	temp.smask <- temp.sum == 1
+	cat("Selected cell numbers: ", length(cell_oi),"\n")
+#	print(head(temp.sum))
+#	temp.seldf <- temp.fildf[temp.smask,]
+#	dim(temp.seldf)
+#	sel_cells <- row.names(temp.seldf)
+#	print(setdiff(sel_cells, cellOi))
+	sc.data <- sc.data[,cell_oi]
 	sc.data[duplicated(sc.data$rownames),]
 	print(dim(sc.data))
 }
@@ -139,12 +142,8 @@ if (mt_cust){
 } else {
 	srsc[["percent.mt"]] <- PercentageFeatureSet(object = srsc, pattern = mt_pat)
 }
-# X11()
 tiff(plot_save[["qc1"]], res = 300, width = 16, heigh = 10, units = 'in')
 VlnPlot(object = srsc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-# prompt  <- "Click OK to close plots."
-# extra   <- "Displaying scRNA seq QC plots."
-# capture <- tk_messageBox(message = prompt, detail = extra)
 garbage <- dev.off()
 
 # Plot the QC correlations 
@@ -159,19 +158,18 @@ garbage <- dev.off()
 # 2) too less RNA [low-quality or empty cells],
 # 3) dead cells [more than 5% expression are from mitochondrial genes]
 srsc <- subset(x = srsc, subset = nFeature_RNA > low_rna_thr & nFeature_RNA < up_rna_thr & percent.mt < mt_thr)
-print("After QC, basic info of Seurat object:",quote=FALSE)
-srsc
+cat("After QC, basic info of Seurat object:")
+print(srsc)
 
 ## Manual QC to keep or remove some genes
 orig_srsc <- srsc
 cur_genes <- rownames(srsc[[default_assay]]@data)
 clean.data <- srsc[[default_assay]]@data
-dim(clean.data)
 # Remove genes
 if (rm_flag){
 	used_rm <- setdiff(cur_genes, rm_genes)
 	clean.data <- clean.data[used_rm,]
-	dim(clean.data)
+	cat("After removing pseudogenes: ", ncol(clean.data), "\n")
 	srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
 }
 # Extract genes
@@ -179,19 +177,27 @@ if (kp_flag){
 	cur_genes <- rownames(clean.data)
 	used_kp <- intersect(cur_genes, kp_genes)
 	clean.data <- clean.data[used_kp,]
-	dim(clean.data)
+	cat("After keeping protein-encoding genes: ", ncol(clean.data), "\n")
 	srsc <- CreateSeuratObject(counts=clean.data, project=sample_id, min.cells=5, min.features=200)
 }
 
-print("After manual QC, basic info of Seurat object:",quote=FALSE)
+## Add meta.data and FACS data
+ava_cell = colnames(srsc)
+if (length(intersect(ava_cell, rownames(meta.data))) != length(ava_cell)) {
+	warning("Cell lost in meta.data!!!")
+}
+ava_metadata = meta.data[intersect(ava_cell, rownames(meta.data)),]
+facs_data = ava_metadata[, facs_markers]
+srsc[["FACS"]] = CreateAssayObject(counts = t(facs_data[colnames(srsc),]))
+srsc@meta.data = ava_metadata[colnames(srsc), meta_cols]
+cat("After manual QC, basic info of Seurat object:\n")
+print(srsc)
 
 srsc <- NormalizeData(object = srsc, normalization.method = "LogNormalize", scale.factor = 10000)
 
 ## Find variable genes
 srsc <- FindVariableFeatures(object = srsc, selection.method = "vst", nfeatures = fv_thr)
-# srsc <- FindVariableFeatures(object = srsc, mean.function = ExpMean, dispersion.function = LogVMR,
-# 			     x.low.cutoff = 0.0125, x.high.cutoff = 3, y.cutoff = 0.5, nfeatures = 1500)
-# Identify the 10 most highly variable genes
+# Identify the 20 most highly variable genes
 top_vg <- head(x = VariableFeatures(object = srsc), 20)
 
 plot1 <- VariableFeaturePlot(object = srsc)
@@ -251,16 +257,30 @@ DimPlot(object = srsc, reduction = "tsne")
 garbage <- dev.off()
 
 # NOTE: Find cluster markers
-clusterMarkers = FindAllMarkers(srsc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-clusterMarkers$sigFlag = 0
-clusterMarkers[clusterMarkers$avg_logFC > 1 & clusterMarkers$p_val_adj <0.10, "sigFlag"] = 2
-posCsv = paste(res_dir, sample_id, "_positive_cluster_markers_only.csv", sep = "")
+clusterMarkers <- FindAllMarkers(srsc, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+clusterMarkers$sigFlag <- 0
+clusterMarkers[clusterMarkers$avg_logFC > 1 & clusterMarkers$p_val_adj <0.10, "sigFlag"] <- 2
+posCsv <- paste(res_dir, sample_id, "_positive_cluster_markers_only.csv", sep = "")
 write.csv(clusterMarkers, file = posCsv)
 
-topMarkers = clusterMarkers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
+topMarkers <- clusterMarkers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
 tiff(paste(res_dir, sample_id, "_cluster_marker_heatmap.tiff", sep = ""), width = 9, height = 12, res = 300, units = 'in')
 DoHeatmap(srsc, features = topMarkers$gene)
 gar = dev.off()
+
+## Plots
+# FACS
+bePlot <- DimPlot(srsc, reduction = "umap", group.by = c("tissue", "plate", "patient"), ncol = 3)
+ggsave(plot = bePlot, filename = plot_save[["batch"]], width = 7.5, height = 6, dpi = 300)
+
+print(head(srsc@meta.data))
+facsPlot <- FeaturePlot(srsc, reduction = "umap", features = facs_markers)
+ggsave(plot = facsPlot, filename = paste(expDirPre, "facs_single_marker_umap_check_plot.tiff", sep = ""), 
+       width = 15, height = 12, dpi = tifres)
+
+pd1cd39Plot <- FeaturePlot(srsc, reduction = "umap", features = "PD1CD39")
+ggsave(plot = pd1cd39Plot, filename = paste(expDirPre, "exhausted_marker_umap_check_plot.tiff", sep = ""), 
+       width = 7.5, height = 6, dpi = tifres)
 
 
 ## Save to RDS
