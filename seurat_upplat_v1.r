@@ -40,7 +40,7 @@ rscript_file <- list.files(git_scfolder, "seurat_upplat_v1.r")
 file.copy(rscript_file, res_dir)
 
 # PARAMETER SECTION!!!
-func_switch = 3 # 1: cluster 2: plot and annotation, must run 1 before 2
+func_switch = 2 # 1: cluster 2: plot and annotation, must run 1 before 2
 selfil <- TRUE # TRUE: will filter by some values from select_file
 fil_items <- c("Tumor","Normal","LN","PBMC") # Breast only
 facs_markers <- c("CCR7", "CD39", "CD45RA", "CD69", "CD103", "CD137", "PD1")
@@ -318,8 +318,6 @@ if (func_switch == 2) {
 	# tSNE with Tex Fig XB
 	pd1cd39Plot <- DimPlot(srsc, reduction = "tsne", group.by = "PD1CD39_Status", pt.size = 2)
 	pd1cd39Plot <- pd1cd39Plot + scale_color_manual(values = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565"))#,
-#							labels = c("PD1-CD39-", "PD1-CD39+", "PD1+CD39-", "PD1+CD39+"))
-#	pd1cd39Plot <- pd1cd39Plot + guides(color=guide_legend(nrow=2,byrow=TRUE))
 	pd1cd39Plot <- pd1cd39Plot + theme(legend.position="bottom")
 	ggsave(plot = pd1cd39Plot, filename = plot_save[["pd1cd39"]], width = 9, height = 6, dpi = tifres)
 
@@ -342,12 +340,12 @@ if (func_switch == 2) {
 	print(DoHeatmap(srsc, features = c(supGenes, sdnGenes), angle = 15,
 			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565")))
 	gar <- dev.off()
-}
+#}
 
-func_switch = 3
-if (func_switch == 3) {
+#func_switch = 3
+#if (func_switch == 3) {
 	cat("Plot only T cells\n")
-	srsc <- readRDS(rds_file)
+#	srsc <- readRDS(rds_file)
 	allMarkers <- read.table(posCsv, header = TRUE, row.names = 1, sep = ",", stringsAsFactors = FALSE)
 	useMarkers <- allMarkers[allMarkers$cluster %in% c(0,1,2,3),]
 	topMarkers <- useMarkers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
@@ -383,44 +381,53 @@ if (func_switch == 3) {
 
 
 	# all facs markers Fig S2
-	facsPlot <- FeaturePlot(srsc, reduction = "tsne", features = str_c("facs_", facs_markers), repel = TRUE)
-	ggsave(plot = facsPlot, filename = paste(res_dir, sample_id, "_clean_facs_markers.tiff", sep = ""), 
-	       width = 15, height = 10, dpi = tifres)
+	for (ifm in facs_markers) {
+		facsPlot <- FeaturePlot(srsc, reduction = "tsne", features = str_c("facs_", ifm), sort.cell = TRUE,
+					cols = c("orange", "purple"))
+		facsPlot <- facsPlot + labs(title = "") + theme(legend.position = "none")
+		ggsave(plot = facsPlot, filename = paste(res_dir, sample_id, "_", ifm, "_clean_facs_markers.tiff", sep = ""), 
+		       width = 6, height = 4, dpi = tifres)
+	}
 
 	# tSNE with Tex Fig XB
 	pd1cd39Plot <- DimPlot(srsc, reduction = "tsne", group.by = "PD1CD39_Status", pt.size = 2)
 	pd1cd39Plot <- pd1cd39Plot + scale_color_manual(values = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565"))#,
-#							labels = c("PD1-CD39-", "PD1-CD39+", "PD1+CD39-", "PD1+CD39+"))
-#	pd1cd39Plot <- pd1cd39Plot + guides(color=guide_legend(nrow=2,byrow=TRUE))
 	pd1cd39Plot <- pd1cd39Plot + theme(legend.position="bottom")
 	ggsave(plot = pd1cd39Plot, filename = paste(res_dir, sample_id, "_clean_pd1cd39.tiff", sep = ""), 
 	       width = 9, height = 6, dpi = tifres)
 
+	# PCA with Tex Fig XB
+	pd1cd39Plot <- DimPlot(srsc, reduction = "pca", group.by = "PD1CD39_Status", pt.size = 2)
+	pd1cd39Plot <- pd1cd39Plot + scale_color_manual(values = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565"))#,
+	pd1cd39Plot <- pd1cd39Plot + theme(legend.position="bottom")
+	ggsave(plot = pd1cd39Plot, filename = paste(res_dir, sample_id, "_clean_pd1cd39_pca.tiff", sep = ""), 
+	       width = 9, height = 6, dpi = tifres)
+
 	# tSNE with cell annotation Fig XA
-	cannPlot <- DimPlot(srsc, reduction = "tsne", group.by = "cell_annot", pt.size = 2)
+	cannPlot <- DimPlot(srsc, reduction = "tsne", group.by = "cell_annot", pt.size = 2, 
+			    cols = c("goldenrod2", "#66CC00", "#D25565", "#B266ff"))
 	cannPlot <- cannPlot + guides(color=guide_legend(nrow=3, byrow=TRUE, override.aes = list(size=5)))
 	cannPlot <- cannPlot + theme(legend.position="bottom")
 	ggsave(plot = cannPlot, filename = paste(res_dir, sample_id, "_clean_cell_annotation.tiff", sep = ""), 
 	       width = 9, height = 6, dpi = tifres)
 
-	# Marker heatmap
-	texMarkers <- FindMarkers(srsc, ident.1 = 2, only.pos = FALSE, logfc.threshold = 0.05)
-	print(head(texMarkers))
-	texMarkerCsv <- paste(res_dir, sample_id, "_clean_tex_markers_only.csv", sep = "")
-	write.csv(texMarkers, file = texMarkerCsv)
-
-	supGenes = rownames(texMarkers)[texMarkers$avg_logFC >= 1.00 & texMarkers$p_val_adj <= 0.10]
-	sdnGenes = rownames(texMarkers)[texMarkers$avg_logFC <= -1.00 & texMarkers$p_val_adj <= 0.10]
-
-	tiff(paste(res_dir, sample_id, "_clean_tex_cluster_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
-	print(DoHeatmap(srsc, features = c(supGenes, sdnGenes), angle = 15,
-			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565")))
-	gar <- dev.off()
-
+	# Cluster marker heatmap
+	srsc@meta.data$cell_annot <- factor(srsc@meta.data$cell_annot, 
+					    levels = c("Resident Effector Memory T cells", "Activated Effector Memory T cells",
+						     "Exhausted T cells", "Central Memory T cells"))
 	tiff(paste(res_dir, sample_id, "_clean_top_markers_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
 	print(DoHeatmap(srsc, features = topHmMarkers, label = FALSE,
-			group.by = c("cell_annot"), group.colors = c("orange", "purple", "#D25565", "blue2")) 
-	+ guides(fill=guide_legend(override.aes = list(size=5))))
+			group.by = c("cell_annot"), group.colors = c("#B266ff", "goldenrod2", "#D25565", "#66CC00")))
+	gar <- dev.off()
+
+	# Tex Marker heatmap
+	cellOi <- colnames(srsc)[srsc@meta.data$PD1CD39_Status != "PD1-CD39+"]
+	subSrsc <- SubsetData(srsc, cells = cellOi)
+	subSrsc@meta.data$PD1CD39_Status <- factor(as.character(subSrsc@meta.data$PD1CD39_Status))
+	levels(subSrsc@meta.data$PD1CD39_Status) <- c("PD1-CD39-", "PD1+CD39-", "PD1+CD39+")
+	tiff(paste(res_dir, sample_id, "_clean_tex_cluster_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
+	print(DoHeatmap(subSrsc, features = c(supGenes, sdnGenes), angle = 15,
+			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#F49938", "#D25565")))
 	gar <- dev.off()
 
 }
