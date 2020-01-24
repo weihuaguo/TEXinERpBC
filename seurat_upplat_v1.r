@@ -40,7 +40,7 @@ rscript_file <- list.files(git_scfolder, "seurat_upplat_v1.r")
 file.copy(rscript_file, res_dir)
 
 # PARAMETER SECTION!!!
-func_switch = 2 # 1: cluster 2: plot and annotation, must run 1 before 2
+func_switch = 3 # 1: cluster 2: plot and annotation, must run 1 before 2
 selfil <- TRUE # TRUE: will filter by some values from select_file
 fil_items <- c("Tumor","Normal","LN","PBMC") # Breast only
 facs_markers <- c("CCR7", "CD39", "CD45RA", "CD69", "CD103", "CD137", "PD1")
@@ -363,11 +363,12 @@ if (func_switch == 3) {
 	srsc@meta.data[srsc@meta.data$seurat_clusters == 1, "cell_annot"] = "Activated Effector Memory T cells"
 	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] = "Central Memory T cells"
 	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] = "Exhausted T cells"
-#	srsc@meta.data[srsc@meta.data$seurat_clusters == 4, "cell_annot"] = "Non-immune cells"
-#	srsc@meta.data[srsc@meta.data$seurat_clusters == 5, "cell_annot"] = "Unknown T cells"
-#	srsc@meta.data[srsc@meta.data$seurat_clusters == 6, "cell_annot"] = "Other immune cells"
 
-	print(head(srsc@meta.data))
+	## Output scaled expression for GSEA analysis
+	scaleData <- as.data.frame(as.matrix(srsc[["RNA"]]@scale.data))
+	metaData <- srsc@meta.data
+	write.csv(scaleData, paste(res_dir, sample_id, "_clean_scale_expression.csv", sep = ""))
+	write.csv(metaData, paste(res_dir, sample_id, "_clean_meta_data.csv", sep = ""))
 
 	## Plots
 	# batch effect check Fig S1
@@ -403,7 +404,7 @@ if (func_switch == 3) {
 	       width = 9, height = 6, dpi = tifres)
 
 	# Marker heatmap
-	texMarkers <- FindMarkers(srsc, ident.1 = 2, only.pos = FALSE)
+	texMarkers <- FindMarkers(srsc, ident.1 = 2, only.pos = FALSE, logfc.threshold = 0.05)
 	print(head(texMarkers))
 	texMarkerCsv <- paste(res_dir, sample_id, "_clean_tex_markers_only.csv", sep = "")
 	write.csv(texMarkers, file = texMarkerCsv)
