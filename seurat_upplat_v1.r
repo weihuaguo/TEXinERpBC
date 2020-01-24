@@ -348,7 +348,7 @@ func_switch = 3
 if (func_switch == 3) {
 	cat("Plot only T cells\n")
 	srsc <- readRDS(rds_file)
-	allMarkers <- read.table(posCsv, header = TRUE, row.names = 1, sep = ",")
+	allMarkers <- read.table(posCsv, header = TRUE, row.names = 1, sep = ",", stringsAsFactors = FALSE)
 	useMarkers <- allMarkers[allMarkers$cluster %in% c(0,1,2,3),]
 	topMarkers <- useMarkers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_logFC)
 	print(head(topMarkers))
@@ -417,8 +417,9 @@ if (func_switch == 3) {
 	gar <- dev.off()
 
 	tiff(paste(res_dir, sample_id, "_clean_top_markers_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
-	print(DoHeatmap(srsc, features = topHmMarkers, angle = 15,
-			group.by = c("cell_annot"), group.colors = c("orange", "purple", "#D25565", "blue2")))
+	print(DoHeatmap(srsc, features = topHmMarkers, label = FALSE,
+			group.by = c("cell_annot"), group.colors = c("orange", "purple", "#D25565", "blue2")) 
+	+ guides(fill=guide_legend(override.aes = list(size=5))))
 	gar <- dev.off()
 
 }
