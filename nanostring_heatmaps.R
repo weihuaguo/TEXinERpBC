@@ -1,6 +1,6 @@
 # This script is for visualizing NanoString results for PD1+CD39+ T exhausted cells
 # Weihua Guo, Ph.D.
-# 11/13/2019
+# 01/26/2020
 
 suppressMessages(library(ComplexHeatmap))
 suppressMessages(library(dplyr))
@@ -10,9 +10,9 @@ suppressMessages(library(circlize))
 
 # Directory in which you save the SI excels
 dataDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_nanostring/final_used_data/"
-resDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_nanostring/final_results/"
+resDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_nanostring/final_results_v2/"
 
-clinAnnXlsx = "facs_ihc_clinical_annot.xlsx"
+clinAnnXlsx = "ihc_clinical_annot_v2.xlsx"
 rawScoreXlsx = "ns_cell_score_raw_log2_no_TIL.xlsx"
 rltScoreXlsx = "ns_cell_score_relative_log2_vs_TIL.xlsx"
 
@@ -36,27 +36,27 @@ write.csv(scaleRawScore, file = paste(resDir, "raw_score_no_TIL_log2_scaled_by_c
 write.csv(scaleRLTScore, file = paste(resDir, "relative_score_no_TIL_log2_scaled_by_cell_type.csv", sep = ""))
 
 backClinAnn = clinAnn
-clinAnn = backClinAnn[order(backClinAnn$TexFACS),]
+clinAnn = backClinAnn[order(backClinAnn$Tex),]
 
 hmRawScore = t(rawScore)
-hmRawScore = as.data.frame(hmRawScore[,rownames(backClinAnn)[order(backClinAnn$TexFACS)]])
+hmRawScore = as.data.frame(hmRawScore[,rownames(backClinAnn)[order(backClinAnn$Tex)]])
 
 hmScaleRawScore = t(scaleRawScore)
-hmScaleRawScore = as.data.frame(hmScaleRawScore[,rownames(backClinAnn)[order(backClinAnn$TexFACS)]])
+hmScaleRawScore = as.data.frame(hmScaleRawScore[,rownames(backClinAnn)[order(backClinAnn$Tex)]])
 
 hmRltScore = t(rltScore)
-hmRltScore = as.data.frame(hmRltScore[,rownames(backClinAnn)[order(backClinAnn$TexFACS)]])
+hmRltScore = as.data.frame(hmRltScore[,rownames(backClinAnn)[order(backClinAnn$Tex)]])
 
 hmScaleRltScore = t(scaleRLTScore)
-hmScaleRltScore = as.data.frame(hmScaleRltScore[,rownames(backClinAnn)[order(backClinAnn$TexFACS)]])
+hmScaleRltScore = as.data.frame(hmScaleRltScore[,rownames(backClinAnn)[order(backClinAnn$Tex)]])
 
-clinHa = HeatmapAnnotation(FACS = anno_barplot(clinAnn[,"TexFACS"], gp = gpar(fill = "#D25565", col = "#D25565")),
+clinHa = HeatmapAnnotation(FACS = anno_barplot(clinAnn[,"Tex"], gp = gpar(fill = "#D25565", col = "#D25565")),
                            CD8 = anno_barplot(clinAnn[,"CD8"], gp = gpar(fill = "cyan", col = "cyan")),
-                           CD20 = anno_barplot(clinAnn[,"CD20"], gp = gpar(fill = "#7030A0", col = "#7030A0")),
+#                           CD20 = anno_barplot(clinAnn[,"CD20"], gp = gpar(fill = "#7030A0", col = "#7030A0")),
                            PDL1 = anno_barplot(clinAnn[,"PDL1"], gp = gpar(fill = "#996633", col = "#996633")),
                            gap = unit(2.4, "mm")
                            )
-names(clinHa) = c("Tex (FACS%)", "CD8 (IHC%)", "CD20 (IHC%)", "PD-L1(IHC%)")
+names(clinHa) = c("Tex(%)", "CD8(%)", "PD-L1(%)")
 scaleCol = colorRamp2(seq(-3, 3, length = 3), c("blue", "white", "red"))
 # print(scaleCol(c(-4,-3.5,3.5, 4)))
 
@@ -64,7 +64,7 @@ rawScoreHm = Heatmap(hmRawScore, name = "Cell score (log2)",
                      show_column_names = TRUE,
                      cluster_columns = FALSE,
                      cluster_rows = FALSE,
-                     column_order = order(clinAnn$TexFACS),
+                     column_order = order(clinAnn$Tex),
                      row_order = order(colnames(rawScore)),
                      top_annotation = clinHa,
 		     cell_fun = function(j, i, x, y, width, height, fill) {
@@ -79,7 +79,7 @@ rltScoreHm = Heatmap(hmRltScore, name = "Relative abundance",
                      show_column_names = TRUE,
                      cluster_columns = FALSE,
                      cluster_rows = FALSE,
-                     column_order = order(clinAnn$TexFACS),
+                     column_order = order(clinAnn$Tex),
                      row_order = order(colnames(rltScore)),
                      top_annotation = clinHa,
 		     cell_fun = function(j, i, x, y, width, height, fill) {
@@ -95,7 +95,7 @@ rawSScoreHm = Heatmap(hmScaleRawScore, name = "Scaled cell score (log2)",
                      show_column_names = TRUE,
                      cluster_columns = FALSE,
                      cluster_rows = FALSE,
-                     column_order = order(clinAnn$TexFACS),
+                     column_order = order(clinAnn$Tex),
                      row_order = order(colnames(rawScore)),
                      top_annotation = clinHa,
 		     cell_fun = function(j, i, x, y, width, height, fill) {
