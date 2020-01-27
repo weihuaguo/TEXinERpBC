@@ -7,33 +7,72 @@ suppressMessages(library(dplyr))
 suppressMessages(library(readxl))
 suppressMessages(library(tibble))
 suppressMessages(library(circlize))
+suppressMessages(library(RColorBrewer))
 
 # Directory in which you save the SI excels
 dataDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_nanostring/final_used_data/"
 resDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_nanostring/final_results_v2/"
 
-clinAnnXlsx = "ihc_clinical_annot_v2.xlsx"
+clinAnnXlsx = "ihc_clinical_annot_v3.xlsx"
+exprXlsx = "ns_normalized_data_log2.xlsx"
+geneTxt = "ns_gene_of_interest_v1.txt"
 rawScoreXlsx = "ns_cell_score_raw_log2_no_TIL.xlsx"
 rltScoreXlsx = "ns_cell_score_relative_log2_vs_TIL.xlsx"
 
 clinAnn = read_excel(paste(dataDir, clinAnnXlsx, sep = ""))
 rawScore = read_excel(paste(dataDir,rawScoreXlsx, sep = ""))
 rltScore = read_excel(paste(dataDir, rltScoreXlsx, sep = ""))
+exprData = read_excel(paste(dataDir, exprXlsx, sep = ""))
+geneOi = scan(paste(dataDir, geneTxt, sep = ""), "\t")
 
 clinAnn = clinAnn %>% column_to_rownames("pid")
 rawScore = rawScore %>% column_to_rownames("pid")
 rltScore = rltScore %>% column_to_rownames("pid")
+exprData = exprData %>% column_to_rownames("pid")
 
 # print(rownames(clinAnn))
 # print(head(clinAnn))
 # print(rownames(rltScore)) 
-
+print(geneOi)
 
 scaleRawScore = scale(rawScore, center = TRUE, scale = TRUE)
 scaleRLTScore = scale(rltScore, center = TRUE, scale = TRUE)
+scaleExprData = scale(exprData, center = TRUE, scale = TRUE)
 
 write.csv(scaleRawScore, file = paste(resDir, "raw_score_no_TIL_log2_scaled_by_cell_type.csv", sep = ""))
 write.csv(scaleRLTScore, file = paste(resDir, "relative_score_no_TIL_log2_scaled_by_cell_type.csv", sep = ""))
+write.csv(scaleExprData, file = paste(resDir, "normalized_expression_log2_scaled_by_gene.csv", sep = ""))
+
+scaleExprOiData = scaleExprData[,geneOi]
+print(dim(scaleExprOiData))
+
+hmScaleExprOiData = t(scaleExprOiData)
+
+clinAnn$TexFACSGroup = factor(clinAnn$TexFACSGroup)
+texHa = HeatmapAnnotation(texg = clinAnn$TexFACSGroup,
+			  col = list(texg = c("Low" = "#0B9BC6", "High" = "#D25565")))
+names(texHa) = c("Tex group")
+scaleCol = colorRamp2(seq(-3, 3, length = 3), c("purple", "black", "yellow"))
+
+
+exprHm = Heatmap(hmScaleExprOiData, name = "Expression",
+		     col = scaleCol,
+                     show_column_names = TRUE,
+                     cluster_columns = FALSE,
+                     cluster_rows = FALSE,
+                     column_order = order(clinAnn$Tex),
+                     row_order = order(colnames(rawScore)),
+                     top_annotation = clinHa,
+#		     cell_fun = function(j, i, x, y, width, height, fill) {
+#			     grid.text(sprintf("%.2f", hmScaleRawScore[i, j]), x, y, gp = gpar(fontsize = 9))},
+                     heatmap_legend_param = list(direction = "horizontal", col_fun = scaleCol))
+
+tiff(paste(resDir, "raw_score_log2_no_TIL_heatmap_scaled_by_cell_type.tiff", sep = ""), res = 300, height = 6, width = 9, units = "in")
+draw(rawSScoreHm, heatmap_legend_side = "bottom")
+gar = dev.off()
+
+
+stop("Test")
 
 backClinAnn = clinAnn
 clinAnn = backClinAnn[order(backClinAnn$Tex),]
