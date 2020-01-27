@@ -98,11 +98,11 @@ rawSScoreHm = Heatmap(hmScaleRawScore, name = "Scaled cell score (log2)",
                      column_order = order(clinAnn$Tex),
                      row_order = order(colnames(rawScore)),
                      top_annotation = clinHa,
-		     cell_fun = function(j, i, x, y, width, height, fill) {
-			     grid.text(sprintf("%.2f", hmScaleRawScore[i, j]), x, y, gp = gpar(fontsize = 9))},
+#		     cell_fun = function(j, i, x, y, width, height, fill) {
+#			     grid.text(sprintf("%.2f", hmScaleRawScore[i, j]), x, y, gp = gpar(fontsize = 9))},
                      heatmap_legend_param = list(direction = "horizontal", col_fun = scaleCol))
 
-tiff(paste(resDir, "raw_score_log2_no_TIL_heatmap_scaled_by_cell_type_test.tiff", sep = ""), res = 300, height = 6, width = 15, units = "in")
+tiff(paste(resDir, "raw_score_log2_no_TIL_heatmap_scaled_by_cell_type.tiff", sep = ""), res = 300, height = 6, width = 9, units = "in")
 draw(rawSScoreHm, heatmap_legend_side = "bottom")
 gar = dev.off()
 
