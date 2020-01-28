@@ -12,6 +12,9 @@ suppressMessages(library(tibble))
 suppressMessages(library(dplyr))
 suppressMessages(library(circlize))
 suppressMessages(library(stringr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(ggpubr))
+
 
 dataDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_Public_Data/final_used_data/"
 resDir = "/home/weihua/mnts/group_plee/Weihua/PD1_CD39_Public_Data/final_outputs/"
@@ -20,20 +23,52 @@ deCsv = "_sym25_tex_ER_cbpt_de_limma.csv"
 exprCsv = "data_expression_median.csv"
 texCsv = "sub_scres_group_ER_cbpt.csv"
 hallGMT = "h.all.v7.0.symbols.gmt"
+cbstTxt = "cbpt_brca_cibersort_annot_merged.txt"
 geneWNames = c("GZMB", "IL7R", "HLA-DRB1", "CCL5", "HLA-DRA", "IDO1", "CD79A", "CD79B", "HLA-DQA1", "CXCL13", "STAT1", "CXCL10")
 
 cat("Reading the METABRIC data...")
 st = Sys.time()
 deResDf = read.table(paste(dataDir, deCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
 # exprDf = read.table(paste(dataDir, exprCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
-exprDf = readRDS(paste(dataDir, "data_expression_median.RDS", sep = ""))
+# exprDf = readRDS(paste(dataDir, "data_expression_median.RDS", sep = ""))
 texGroup = read.table(paste(dataDir, texCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
 hallDf = as.data.frame(read.table(paste(dataDir, hallGMT, sep = ""), sep = "\t", row.names = 1, fill = TRUE, stringsAsFactors = FALSE))
+cbstDf = read.table(paste(dataDir, cbstTxt, sep = ""), sep = "\t", row.names = 2, header = TRUE)
+
 print(Sys.time()-st)
 
 # print(head(deResDf))
 # print(exprDf[1:9,1:6])
 # print(head(texGroup))
+# print(head(cbstDf))
+
+pidOi = rownames(texGroup)[texGroup$group != "Medium"]
+clinOiAnn = texGroup[texGroup$group != "Medium",]
+# print(pidOi)
+
+cbstDf[,1] = NULL
+cbstERDf = cbstDf[pidOi,]
+cbstERDf = cbind(cbstERDf, clinOiAnn)
+cbstCellTypes = colnames(cbstERDf)[1:(match("P.value", colnames(cbstERDf))-1)]
+cbstSprERDf = gather(cbstERDf, "cell_type", "relative_abundance", cbstCellTypes)
+print(head(cbstSprERDf))
+
+cbstGG = ggboxplot(cbstSprERDf, x = "cell_type", y = "relative_abundance", color = "group", 
+		   add = "jitter", add.params = list(alpha = 0.2, size = 0.9),
+		   palette = c("#D25565", "#0B9BC6"), outlier.shape = NA,
+		   ylab = "Relative abundance", xlab = "Immune cell type", legend = "right") +
+	stat_compare_means(method = "t.test", aes(label = ..p.signif.., group = group), hide.ns = TRUE, label.y = 0.72) +
+	rotate_x_text(45)
+cbstHGG = ggpar(cbstGG, legend.title = "Tex group")
+ggsave(cbstHGG, filename = paste(resDir, "cbst_er_pos_metabric_boxplot_horz.tiff", sep = ""), dpi = 300, width = 9, height = 6)
+cbstGG = ggboxplot(cbstSprERDf, x = "cell_type", y = "relative_abundance", color = "group", 
+		   add = "jitter", add.params = list(alpha = 0.2, size = 0.9),
+		   palette = c("#D25565", "#0B9BC6"), outlier.shape = NA,
+		   ylab = "Relative abundance", xlab = "Immune cell type", legend = "right") +
+	stat_compare_means(method = "t.test", aes(label = ..p.signif.., group = group), hide.ns = TRUE, label.y = 0.72) +
+	coord_flip()
+cbstVGG = ggpar(cbstGG, legend.title = "Tex group")
+ggsave(cbstVGG, filename = paste(resDir, "cbst_er_pos_metabric_boxplot_vert.tiff", sep = ""), dpi = 300, width = 6, height = 9)
 
 sigUpGenes = rownames(deResDf)[deResDf$logFC >= 1.0 & deResDf$adj.P.Val <= 0.10]
 sigDwGenes = rownames(deResDf)[deResDf$logFC <= -1.0 & deResDf$adj.P.Val <= 0.10]
@@ -103,9 +138,6 @@ sigGenes = rownames(geneAnn)
 
 write.csv(hallOlDf, paste(resDir, "hallmark_row_annotation_overlap_result.csv", sep = ""))
 
-pidOi = rownames(texGroup)[texGroup$group != "Medium"]
-clinOiAnn = texGroup[texGroup$group != "Medium",]
-# print(pidOi)
 
 # print(length(intersect(c(sigUpGenes, sigDwGenes), exprDf$Hugo_Symbol)))
 exprOiData = exprDf[exprDf$Hugo_Symbol %in% sigGenes,]
