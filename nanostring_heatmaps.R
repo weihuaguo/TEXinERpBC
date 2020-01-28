@@ -155,6 +155,25 @@ tiff(paste(resDir, "raw_score_log2_no_TIL_heatmap_scaled_by_cell_type.tiff", sep
 draw(rawSScoreHm, heatmap_legend_side = "bottom")
 gar = dev.off()
 
+hmScaleExprOiData = t(scaleExprOiData)
+hmScaleExprOiData = as.data.frame(hmScaleExprOiData[, rownames(backClinAnn)[order(backClinAnn$Tex)]])
+rownames(hmScaleExprOiData) = str_replace(rownames(hmScaleExprOiData), "-mRNA", "")
+
+exprHmWA = Heatmap(hmScaleExprOiData, name = "Expression",
+		     col = scaleCol,
+                     show_column_names = TRUE,
+                     cluster_columns = FALSE,
+                     cluster_rows = TRUE,
+                     column_order = order(clinAnn$Tex),
+#                     row_order = order(colnames(rawScore)),
+                     top_annotation = clinHa,
+#		     cell_fun = function(j, i, x, y, width, height, fill) {
+#			     grid.text(sprintf("%.2f", hmScaleRawScore[i, j]), x, y, gp = gpar(fontsize = 9))},
+                     heatmap_legend_param = list(direction = "vertical", col_fun = scaleCol))
+
+tiff(paste(resDir, "normalized_expression_log2_heatmap_scaled_by_gene_bar_annot.tiff", sep = ""), res = 300, height = 6, width = 9, units = "in")
+draw(exprHmWA, heatmap_legend_side = "right")
+gar = dev.off()
 
 rltSScoreHm = Heatmap(hmScaleRltScore, name = "Scaled relative abundance",
 		     col = scaleCol,
