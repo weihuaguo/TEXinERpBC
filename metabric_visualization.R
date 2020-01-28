@@ -167,7 +167,6 @@ exprHm = Heatmap(as.matrix(hmScaleExprData), name = "Expression",
 		     show_row_names = FALSE,
                      cluster_columns = FALSE,
                      cluster_rows = FALSE,
-#		     column_order = order(clinAnn$TexFACSGroup),
 		     row_order = order(geneAnn$Pathway1),
                      top_annotation = texHa,
 		     left_annotation = pathHa,
@@ -178,18 +177,16 @@ tiff(paste(resDir, "normalized_expression_heatmap_scaled_by_gene.tiff", sep = ""
 draw(exprHm, heatmap_legend_side = "top", merge_legend = TRUE)
 gar = dev.off()
 
-## Scaled version
+## Scaled version with gene names
 exprHm = Heatmap(as.matrix(hmScaleExprData), name = "Expression",
 		     col = scaleCol,
                      show_column_names = FALSE,
 		     show_row_names = TRUE,
                      cluster_columns = FALSE,
                      cluster_rows = FALSE,
-#		     column_order = order(clinAnn$TexFACSGroup),
 		     row_order = order(geneAnn$Pathway1),
                      top_annotation = texHa,
 		     left_annotation = pathHa,
-#		     right_annotation = geneHa,
                      heatmap_legend_param = list(direction = "horizontal", col_fun = scaleCol))
 
 tiff(paste(resDir, "normalized_expression_heatmap_scaled_by_gene_w_genename.tiff", sep = ""), 
