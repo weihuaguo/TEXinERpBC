@@ -40,7 +40,7 @@ rscript_file <- list.files(git_scfolder, "seurat_upplat_v1.r")
 file.copy(rscript_file, res_dir)
 
 # PARAMETER SECTION!!!
-func_switch = 2 # 1: cluster 2: plot and annotation, must run 1 before 2
+func_switch <- 2 # 1: cluster 2: plot and annotation, must run 1 before 2
 selfil <- TRUE # TRUE: will filter by some values from select_file
 fil_items <- c("Tumor","Normal","LN","PBMC") # Breast only
 facs_markers <- c("CCR7", "CD39", "CD45RA", "CD69", "CD103", "CD137", "PD1")
@@ -285,18 +285,18 @@ if (func_switch == 1) {
 # func_switch = 2 # enforce run plot functions
 if (func_switch == 2) {
 	cat("Plot all the cells and justify the cluster quality\n")
-	srsc = readRDS(rds_file)
+	srsc <- readRDS(rds_file)
 	print(srsc)
 
-	srsc@meta.data$cell_annot = str_c("T cell ", (as.numeric(as.character(srsc@meta.data$seurat_clusters))+1))
+	srsc@meta.data$cell_annot <- str_c("T cell ", (as.numeric(as.character(srsc@meta.data$seurat_clusters))+1))
 	
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 0, "cell_annot"] = "Resident Effector Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 1, "cell_annot"] = "Activated Effector Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] = "Central Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] = "Exhausted T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 4, "cell_annot"] = "Non-immune cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 5, "cell_annot"] = "Neutrophils"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 6, "cell_annot"] = "Other immune cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 0, "cell_annot"] <- "Resident Effector Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 1, "cell_annot"] <- "Activated Effector Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] <- "Central Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] <- "Exhausted T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 4, "cell_annot"] <- "Non-immune cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 5, "cell_annot"] <- "Neutrophils"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 6, "cell_annot"] <- "Other immune cells"
 
 #	print(head(srsc@meta.data))
 
@@ -333,8 +333,8 @@ if (func_switch == 2) {
 	texMarkerCsv <- paste(res_dir, sample_id, "_tex_markers_only.csv", sep = "")
 	write.csv(texMarkers, file = texMarkerCsv)
 
-	supGenes = rownames(texMarkers)[texMarkers$avg_logFC >= 1.00 & texMarkers$p_val_adj <= 0.10]
-	sdnGenes = rownames(texMarkers)[texMarkers$avg_logFC <= -1.00 & texMarkers$p_val_adj <= 0.10]
+	supGenes <- rownames(texMarkers)[texMarkers$avg_logFC >= 1.00 & texMarkers$p_val_adj <= 0.10]
+	sdnGenes <- rownames(texMarkers)[texMarkers$avg_logFC <= -1.00 & texMarkers$p_val_adj <= 0.10]
 
 	tiff(paste(res_dir, sample_id, "_tex_cluster_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
 	print(DoHeatmap(srsc, features = c(supGenes, sdnGenes), angle = 15,
@@ -352,15 +352,15 @@ if (func_switch == 2) {
 	print(head(topMarkers))
 	topHmMarkers <- topMarkers$gene
 
-	srsc = SubsetData(srsc, ident.use = c(0,1,2,3))
+	srsc <- subset(srsc, idents = c(0, 1, 2, 3))
 	print(srsc)
 
-	srsc@meta.data$cell_annot = str_c("T cell ", (as.numeric(as.character(srsc@meta.data$seurat_clusters))+1))
+	srsc@meta.data$cell_annot <- str_c("T cell ", (as.numeric(as.character(srsc@meta.data$seurat_clusters))+1))
 	
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 0, "cell_annot"] = "Resident Effector Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 1, "cell_annot"] = "Activated Effector Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] = "Central Memory T cells"
-	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] = "Exhausted T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 0, "cell_annot"] <- "Resident Effector Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 1, "cell_annot"] <- "Activated Effector Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] <- "Central Memory T cells"
+	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] <- "Exhausted T cells"
 
 	## Output scaled expression for GSEA analysis
 	scaleData <- as.data.frame(as.matrix(srsc[["RNA"]]@scale.data))
@@ -421,12 +421,13 @@ if (func_switch == 2) {
 	gar <- dev.off()
 
 	# Tex Marker heatmap
-	cellOi <- colnames(srsc)[srsc@meta.data$PD1CD39_Status != "PD1-CD39+"]
-	subSrsc <- SubsetData(srsc, cells = cellOi)
+#	cellOi <- colnames(srsc)[srsc@meta.data$PD1CD39_Status != "PD1-CD39+"]
+#	subSrsc <- SubsetData(srsc, cells = cellOi)
+	subSrsc <- subset(srsc, subset = PD1CD39_Status == "PD1-CD39+", invert = TRUE)
 	subSrsc@meta.data$PD1CD39_Status <- factor(as.character(subSrsc@meta.data$PD1CD39_Status))
 	levels(subSrsc@meta.data$PD1CD39_Status) <- c("PD1-CD39-", "PD1+CD39-", "PD1+CD39+")
 	tiff(paste(res_dir, sample_id, "_clean_tex_cluster_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
-	print(DoHeatmap(subSrsc, features = c(supGenes, sdnGenes), angle = 15,
+	print(DoHeatmap(subSrsc, features = c(supGenes, sdnGenes), angle = 15, label = FALSE,
 			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#F49938", "#D25565")))
 	gar <- dev.off()
 
