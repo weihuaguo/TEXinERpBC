@@ -30,7 +30,7 @@ cat("Reading the METABRIC data...")
 st = Sys.time()
 deResDf = read.table(paste(dataDir, deCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
 # exprDf = read.table(paste(dataDir, exprCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
-# exprDf = readRDS(paste(dataDir, "data_expression_median.RDS", sep = ""))
+exprDf = readRDS(paste(dataDir, "data_expression_median.RDS", sep = ""))
 texGroup = read.table(paste(dataDir, texCsv, sep = ""), header = TRUE, row.names = 1, sep = ",")
 hallDf = as.data.frame(read.table(paste(dataDir, hallGMT, sep = ""), sep = "\t", row.names = 1, fill = TRUE, stringsAsFactors = FALSE))
 cbstDf = read.table(paste(dataDir, cbstTxt, sep = ""), sep = "\t", row.names = 2, header = TRUE)
@@ -74,6 +74,55 @@ sigUpGenes = rownames(deResDf)[deResDf$logFC >= 1.0 & deResDf$adj.P.Val <= 0.10]
 sigDwGenes = rownames(deResDf)[deResDf$logFC <= -1.0 & deResDf$adj.P.Val <= 0.10]
 # print(sigUpGenes)
 # print(sigDwGenes)
+
+## Simple heatmaps for visualization of DE results
+backClinAnn = clinOiAnn
+clinAnn = backClinAnn[order(backClinAnn$group),]
+# print(head(clinAnn))
+
+allSigGenes = c(sigUpGenes, sigDwGenes)
+deSigResDf = deResDf[allSigGenes,]
+exprOiData = exprDf[exprDf$Hugo_Symbol %in% allSigGenes,]
+exprOiData = exprOiData[,c("Hugo_Symbol", pidOi)]
+# print(length(c(sigUpGenes, sigDwGenes)))
+# print(dim(exprOiData))
+rownames(exprOiData) = exprOiData$Hugo_Symbol
+exprOiData$Hugo_Symbol = NULL
+scaleExprOiData = scale(t(exprOiData), center = TRUE, scale = TRUE)
+hmScaleExprData = t(scaleExprOiData)
+hmScaleExprData = hmScaleExprData[, rownames(backClinAnn)[order(backClinAnn$group)]]
+hmScaleExprData = hmScaleExprData[rownames(deSigResDf)[order(deSigResDf$logFC)],]
+deSigResDf = deSigResDf[rownames(deSigResDf)[order(deSigResDf$logFC)],]
+
+# print(exprOiData[1:9, 1:6])
+fcCol = colorRamp2(c(min(deSigResDf$logFC), 0, max(deSigResDf$logFC)), c("dodgerblue", "floralwhite", "firebrick2"))
+fcHa = HeatmapAnnotation(logfc = deSigResDf$logFC, col = list(logfc = fcCol), which = "row", 
+			 annotation_legend_param = list(logfc = list(title = "log2FC", legend_direction = "horizontal", col_fun = fcCol)))
+names(fcHa) = c("log2FC")
+texHa = HeatmapAnnotation(texg = clinAnn$group,
+			  col = list(texg = c("Low" = "#0B9BC6", "High" = "#D25565")),
+			  annotation_legend_param = list(texg = list(title = "Tex group", legend_direction = "horizontal", nrow = 2)))
+names(texHa) = c("Tex group")
+scaleCol = colorRamp2(seq(-3, 3, length = 3), c("purple", "black", "yellow"))
+
+fcHm = Heatmap(hmScaleExprData, name = "Expression",
+		 col = scaleCol,
+		 show_column_names = FALSE,
+		 show_row_names = TRUE,
+		 cluster_columns = FALSE,
+		 cluster_rows = FALSE,
+		 row_names_gp = gpar(fontsize = 10),
+		 top_annotation = texHa,
+		 left_annotation = fcHa,
+		 height = unit(49, "cm"),
+		 heatmap_legend_param = list(direction = "horizontal", col_fun = scaleCol))
+tiff(paste(resDir, "normalized_expression_heatmap_scaled_by_gene_w_genename_all.tiff", sep = ""), 
+     res = 300, height = 21, width = 9, units = "in")
+draw(fcHm, heatmap_legend_side = "top", merge_legend = TRUE)
+gar = dev.off()
+
+
+q(save = "no")
 
 # Prepare hallmark GMT
 hallDf = hallDf[,-1]
