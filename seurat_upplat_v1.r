@@ -392,9 +392,12 @@ if (func_switch == 2) {
 	# tSNE with Tex Fig XB
 	pd1cd39Plot <- DimPlot(srsc, reduction = "tsne", group.by = "PD1CD39_Status", pt.size = 2)
 	pd1cd39Plot <- pd1cd39Plot + scale_color_manual(values = c("#0B9BC6", "#E0E0E0", "#F49938", "#D25565"))#,
-	pd1cd39Plot <- pd1cd39Plot + theme(legend.position="bottom")
+	pd1cd39Plot <- pd1cd39Plot + theme(legend.position="bottom", legend.text=element_text(size=20)) 
+	ggsave(plot = pd1cd39Plot, filename = paste(res_dir, sample_id, "_clean_pd1cd39.svg", sep = ""), 
+	       width = 9, height = 6, dpi = tifres)
 	ggsave(plot = pd1cd39Plot, filename = paste(res_dir, sample_id, "_clean_pd1cd39.tiff", sep = ""), 
 	       width = 9, height = 6, dpi = tifres)
+
 
 	# PCA with Tex Fig XB
 	pd1cd39Plot <- DimPlot(srsc, reduction = "pca", group.by = "PD1CD39_Status", pt.size = 2)
@@ -407,7 +410,7 @@ if (func_switch == 2) {
 	cannPlot <- DimPlot(srsc, reduction = "tsne", group.by = "cell_annot", pt.size = 2, 
 			    cols = c("goldenrod2", "#66CC00", "#D25565", "#B266ff"))
 	cannPlot <- cannPlot + guides(color=guide_legend(nrow=3, byrow=TRUE, override.aes = list(size=5)))
-	cannPlot <- cannPlot + theme(legend.position="bottom")
+	cannPlot <- cannPlot + theme(legend.position="bottom", legend.text=element_text(size=18))
 	ggsave(plot = cannPlot, filename = paste(res_dir, sample_id, "_clean_cell_annotation.tiff", sep = ""), 
 	       width = 9, height = 6, dpi = tifres)
 
@@ -417,7 +420,8 @@ if (func_switch == 2) {
 						     "Exhausted T cells", "Central Memory T cells"))
 	tiff(paste(res_dir, sample_id, "_clean_top_markers_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
 	print(DoHeatmap(srsc, features = topHmMarkers, label = FALSE,
-			group.by = c("cell_annot"), group.colors = c("#B266ff", "goldenrod2", "#D25565", "#66CC00")))
+			group.by = c("cell_annot"), group.colors = c("#B266ff", "goldenrod2", "#D25565", "#66CC00")) 
+	+ theme(legend.text = element_text(size = 15), legend.title = element_text(size = 15)))
 	gar <- dev.off()
 
 	# Tex Marker heatmap
@@ -428,7 +432,8 @@ if (func_switch == 2) {
 	levels(subSrsc@meta.data$PD1CD39_Status) <- c("PD1-CD39-", "PD1+CD39-", "PD1+CD39+")
 	tiff(paste(res_dir, sample_id, "_clean_tex_cluster_heatmap.tiff", sep = ""), width = 9, height = 6, res = tifres, units = 'in')
 	print(DoHeatmap(subSrsc, features = c(supGenes, sdnGenes), angle = 15, label = FALSE,
-			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#F49938", "#D25565")))
+			group.by = c("PD1CD39_Status"), group.colors = c("#0B9BC6", "#F49938", "#D25565")) 
+	+ theme(legend.text = element_text(size = 15), legend.title = element_text(size = 15)))
 	gar <- dev.off()
 
 }
