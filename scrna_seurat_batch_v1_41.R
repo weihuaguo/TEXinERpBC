@@ -457,6 +457,7 @@ subClusterFlag <- FALSE # Re-cluster for each general cell types
 tcrAnaFlag <- FALSE
 monocle3TCR <- FALSE
 specDEFlag <- TRUE
+pngRes <- 300
 
 dir.create(file.path(resDir, expID), showWarnings = FALSE)
 expDir <- paste(resDir, expID, "/", sep = "")
@@ -781,6 +782,8 @@ if (subClusterFlag) {
 if (specDEFlag) {
 	## Run DE analysis between PD-L1+/PD-L1- TAMs (Highly customized!)
 	cat("Run differential expression between specific cohorts...\n")
+	geneOi <- c("IFIT3", "IFI44L", "IFI44", "ISG15", "MX1", "IFIT1", "IFI6", 
+		    "IFIT2", "IFI27", "STAT1", "CXCL10", "CXCL9", "OAS1", "OASL", "MX1")
 	## Read the Seurat objects
 	proObj <- readRDS(paste(intePf, "Seurat_Objects_Clustered.RDS", sep = ""))
 
@@ -796,11 +799,60 @@ if (specDEFlag) {
 		tmpMask <- proObj@meta.data$patient %in% texAnnList[[itt]]
 		proObj@meta.data[tmpMask, "TEX"] <- itt
 	}
+	proObj@meta.data$tumor <- "Non-tumor cells"
+	tumor_mask <- proObj@meta.data$seurat_clusters %in% c(1, 6, 8, 10, 16)
+	proObj@meta.data[tumor_mask, "tumor"] <- "Tumor cells"
+	tumorFGG <- FeaturePlot(proObj, features = geneOi[1:7], sort.cell = T, split.by = "tumor")
+	ggsave(paste(intePf, "umap_ifn_gene_tumor_only_part1.png", sep = ""), tumorFGG,
+	       dpi = pngRes, width = 9, height = 21)
+	tumorFGG <- FeaturePlot(proObj, features = geneOi[8:14], sort.cell = T, split.by = "tumor")
+	ggsave(paste(intePf, "umap_ifn_gene_tumor_only_part2.png", sep = ""), tumorFGG,
+	       dpi = pngRes, width = 9, height = 21)
+
+
 
 	## Subset 
 	rawObj <- proObj
 	proObj <- subset(rawObj, idents = c(1, 6, 8, 10, 16))
 	texCol <- c("dodgerblue", "firebrick")
+
+	cat("Vln plot visualization for gene of interest...\n")
+	vlnGG <- VlnPlot(proObj, features = geneOi, group.by = "TEX", ncol = 5,
+			 pt.size = 0.01, cols = c("firebrick", "dodgerblue"))
+	ggsave(paste(intePf, "vlnplot_tex_high_vs_low_tumor_cells.png", sep = ""), vlnGG,
+	       dpi = pngRes, width = 9, height = 7.5)
+	print(proObj)
+	exprDf <- as.matrix(proObj[["RNA"]]@data[geneOi,])
+	exprDf <- cbind(t(exprDf), proObj@meta.data)
+	gathDf <- gather(exprDf, "gene", "expr", geneOi)
+
+	sumGathDf <- gathDf %>% 
+		group_by(gene, TEX) %>%
+		summarise(
+			  sd = sd(expr, na.rm=T),
+			  expr = mean(expr),
+			  n = n()
+			  )
+	sumGathDf$sem <- sumGathDf$sd/(sumGathDf$n)^0.5
+#	print(head(gathDf))
+	print(head(sumGathDf))
+
+	barPtGG <- ggplot(gathDf, aes_string(x = "TEX", y = "expr")) +
+		geom_bar(stat = "identity", data = sumGathDf, fill = NA, aes_string(color = "TEX")) +
+		geom_jitter(position = position_jitter(0.2), aes_string(color = "TEX"), size = 0.2, alpha = 0.6) +
+		geom_errorbar(aes(ymin = expr-sem, ymax = expr+sem), data = sumGathDf, width = 0.2) +
+		scale_color_manual(values = c("firebrick", "dodgerblue")) +
+		stat_compare_means(data = gathDf, mapping = aes_string(group = "TEX"), 
+				   label = "p.signif", label.x = 1.35, vjust = 1, method = "wilcox.test") +
+		labs(y = "Expression levels", color = "Group") +
+		facet_wrap(~ gene, ncol = 7, scales = "free") +
+		theme_bw() +
+		theme(axis.title.x = element_blank(),
+		      legend.position = "top")
+	ggsave(paste(intePf, "manual_barplot_tex_high_vs_low_tumor_cells.png", sep = ""), barPtGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+	q(save = "no")
 
 	cat("Start to run DE analysis -- Wilcox\n")
 	deRes <- FindMarkers(proObj, ident.1 = "TEXhigh", ident.2 = "TEXlow", group.by = "TEX", test.use = "wilcox")
