@@ -822,6 +822,14 @@ if (specDEFlag) {
 	ggsave(paste(intePf, "vlnplot_tex_high_vs_low_tumor_cells.png", sep = ""), vlnGG,
 	       dpi = pngRes, width = 9, height = 7.5)
 	print(proObj)
+
+	tumorFGG <- FeaturePlot(proObj, features = geneOi[1:7], sort.cell = T, split.by = "TEX")
+	ggsave(paste(intePf, "umap_ifn_gene_tumor_only_tex_part1.png", sep = ""), tumorFGG,
+	       dpi = pngRes, width = 9, height = 21)
+	tumorFGG <- FeaturePlot(proObj, features = geneOi[8:14], sort.cell = T, split.by = "TEX")
+	ggsave(paste(intePf, "umap_ifn_gene_tumor_only_tex_part2.png", sep = ""), tumorFGG,
+	       dpi = pngRes, width = 9, height = 21)
+
 	exprDf <- as.matrix(proObj[["RNA"]]@data[geneOi,])
 	exprDf <- cbind(t(exprDf), proObj@meta.data)
 	gathDf <- gather(exprDf, "gene", "expr", geneOi)
@@ -850,6 +858,35 @@ if (specDEFlag) {
 		theme(axis.title.x = element_blank(),
 		      legend.position = "top")
 	ggsave(paste(intePf, "manual_barplot_tex_high_vs_low_tumor_cells.png", sep = ""), barPtGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+
+	boxGG <- ggplot(gathDf, aes_string(x = "TEX", y = "expr")) +
+		geom_boxplot(fill = NA, aes_string(color = "TEX"), outlier.size = 0.5, outlier.shape = 16) +
+		geom_jitter(position = position_jitter(0.2), aes_string(color = "TEX"), size = 0.2, alpha = 0.6) +
+		scale_color_manual(values = c("firebrick", "dodgerblue")) +
+		stat_compare_means(data = gathDf, mapping = aes_string(group = "TEX"), 
+				   label = "p.signif", label.x = 1.35, vjust = 1, method = "wilcox.test") +
+		labs(y = "Expression levels", color = "Group") +
+		facet_wrap(~ gene, ncol = 7, scales = "free") +
+		theme_bw() +
+		theme(axis.title.x = element_blank(),
+		      legend.position = "top")
+	ggsave(paste(intePf, "manual_boxplot_tex_high_vs_low_tumor_cells.png", sep = ""), boxGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+	vlnGG <- ggplot(gathDf, aes_string(x = "TEX", y = "expr")) +
+		geom_violin(fill = NA, aes_string(color = "TEX"), trim = FALSE) +
+		geom_jitter(position = position_jitter(0.2), aes_string(color = "TEX"), size = 0.2, alpha = 0.6) +
+		scale_color_manual(values = c("firebrick", "dodgerblue")) +
+		stat_compare_means(data = gathDf, mapping = aes_string(group = "TEX"), 
+				   label = "p.signif", label.x = 1.35, vjust = 1, method = "wilcox.test") +
+		labs(y = "Expression levels", color = "Group") +
+		facet_wrap(~ gene, ncol = 7, scales = "free") +
+		theme_bw() +
+		theme(axis.title.x = element_blank(),
+		      legend.position = "top")
+	ggsave(paste(intePf, "manual_vlnplot_tex_high_vs_low_tumor_cells.png", sep = ""), vlnGG,
 	       dpi = pngRes, width = 9, height = 6)
 
 	q(save = "no")
