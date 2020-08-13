@@ -50,6 +50,8 @@ suppressMessages(library(edgeR))
 suppressMessages(library(readxl))
 suppressMessages(library(stringr))
 suppressMessages(library(ggplot2))
+suppressMessages(library(survival))
+suppressMessages(library(survminer))
 suppressMessages(library(GEOquery))
 
 data_dir <- "/home/weihua/mnts/group_plee/Weihua/tamoxifen_public_data/"
@@ -78,11 +80,13 @@ gse1_file <- "GSE82171_series_matrix.txt"
 gse2_file <- "GSE82172_series_matrix.txt"
 gpl1_file <- "GPL570_55999.xlsx"
 gpl2_file <- "gpl13158_5065.xlsx"
-# sign_file <- "tex_signature_colt_c2.txt"
-sign_file <- "interferon_gamma_signature.txt"
-spl_file <- "manual_annotation_GSE82171_2_v1.xlsx"
+sign_file <- "tex_signature_colt_c2.txt"
+# sign_file <- "interferon_gamma_signature.txt"
+spl_file <- "manual_annotation_GSE82171_2_v2.xlsx"
 
-signame <- "IFNg"
+signame <- "TEX_321_age"
+res_group <- "PD"
+p_for <- "p.signif"
 png_res <- 300
 
 cat("Reading signatures...\n")
@@ -93,9 +97,16 @@ cat("Reading the sample information...\n")
 spl_df <- as.data.frame(read_excel(paste(data_dir, spl_file, sep = ""), sheet = "sum"))
 rownames(spl_df) <- spl_df$GSM
 spl_df$Res <- "Responsed"
-ns_mask <- str_detect(spl_df$Response, "D")
+ns_mask <- str_detect(spl_df$Response, res_group)
 spl_df$Res[ns_mask] <- "Non-responsed"
+spl_df$Age <- "Unknown"
+old_mask <- spl_df$`Age at diagnosis` >= 55 & !is.na(spl_df$`Age at diagnosis`)
+spl_df$Age[old_mask] <- ">=55"
+yng_mask <- spl_df$`Age at diagnosis` < 55 & !is.na(spl_df$`Age at diagnosis`)
+spl_df$Age[yng_mask] <- "<55"
+
 print(head(spl_df))
+# print(spl_df)
 
 cat("Reading series table -- GSE82171\n")
 gse1_df <- read.table(paste(data_dir, gse1_file, sep = ""), skip = 60, header = TRUE, 
@@ -130,22 +141,76 @@ colnames(sig_score2) <- c(signame)
 sig_scores <- rbind(sig_score1, sig_score2)
 spl_df <- spl_df[rownames(sig_scores),]
 plot_scores <- cbind(sig_scores, spl_df)
+
+plot_scores$group <- "High"
+cutoff <- median(plot_scores[,signame])
+plot_scores$group[plot_scores[,signame] <= cutoff] <- "Low"
 print(head(plot_scores))
 
+write.csv(plot_scores, paste(data_dir, signame, "combined_score_with_clinical_info.csv", sep = ""))
+cat("Start survival analysis...\n")
+fit <- survfit(Surv(dfs, dfsi) ~ group, data = plot_scores)
+tmp_gg <- ggsurvplot(fit, data = plot_scores, conf.int = TRUE, pval = TRUE, fun = "pct", risk.table = TRUE, size = 1,
+		     legend.title = signame)
+png(paste(data_dir, signame, "_median_cutoff_survival_curve_dfs.png", sep = ""), res = png_res, width = 7.5, height = 6, units = 'in')
+print(tmp_gg)
+gb <- dev.off()
+
+fit <- survfit(Surv(pfs, pfsi) ~ group, data = plot_scores)
+tmp_gg <- ggsurvplot(fit, data = plot_scores, conf.int = TRUE, pval = TRUE, fun = "pct", risk.table = TRUE, size = 1,
+		     legend.title = signame)
+png(paste(data_dir, signame, "_median_cutoff_survival_curve_pfs.png", sep = ""), res = png_res, width = 7.5, height = 6, units = 'in')
+print(tmp_gg)
+gb <- dev.off()
+
+plot_scores$sig <- plot_scores[, signame]
+plot_scores$raw_age <- plot_scores[, "Age at diagnosis"]
+fit <- coxph(Surv(dfs, dfsi) ~ sig + `Age at diagnosis` + Res, data = plot_scores)
+forest_gg <- ggforest(fit)
+png(paste(data_dir, signame, "_median_cutoff_forest_dfs_coxph_age_Res.png", sep = ""), res = png_res, width = 7.5, height = 6, units = 'in')
+print(forest_gg)
+gb <- dev.off()
+
+fit <- coxph(Surv(pfs, pfsi) ~ sig + `Age at diagnosis` + Res, data = plot_scores)
+forest_gg <- ggforest(fit)
+png(paste(data_dir, signame, "_median_cutoff_forest_pfs_coxph_age_Res.png", sep = ""), res = png_res, width = 7.5, height = 6, units = 'in')
+print(forest_gg)
+gb <- dev.off()
+
+fit <- coxph(Surv(dfs, dfsi) ~ group + raw_age + Res, data = plot_scores)
+tmp_gg <- ggadjustedcurves(fit, data = plot_scores, variable="group")
+png(paste(data_dir, signame, "_median_cutoff_dfs_coxph_curve.png", sep = ""), res = png_res, width = 6, height = 6, units = 'in')
+print(tmp_gg)
+gb <- dev.off()
+
+fit <- coxph(Surv(pfs, pfsi) ~ group + raw_age + Res, data = plot_scores)
+tmp_gg <- ggadjustedcurves(fit, data = plot_scores, variable="group")
+png(paste(data_dir, signame, "_median_cutoff_pfs_coxph_curve.png", sep = ""), res = png_res, width = 6, height = 4, units = 'in')
+print(tmp_gg)
+gb <- dev.off()
+
+
+q(save = "no")
+
+cat("Visualization with boxplot...\n")
 boxGG <- ggplot(plot_scores, aes_string(x = "Response", y = signame)) +
 	geom_boxplot(aes_string(color = "Response"), fill = NA) +
 	geom_jitter(position = position_jitter(0.2), aes_string(color = "Response", shape = "GSE"), 
 		    size = 2.4, alpha = 0.6) +
 	scale_color_manual(values = c("firebrick1","dodgerblue1",  "firebrick4", "dodgerblue4")) +
 	stat_compare_means(data = plot_scores, mapping = aes_string(group = "Response"), 
-			   label = "p.signif", label.x = 1.35, vjust = 1, method = "anova") +
+			   label = p_for, label.x = 1.35, vjust = 1, method = "anova") +
 	labs(y = paste(signame, "signature"), color = "Tamoxifen\nresponses", shape = "Dataset") +
-#	facet_wrap(~ gene, ncol = 7, scales = "free") +
 	theme_bw() +
 	theme(axis.title.x = element_blank(),
 	      legend.position = "right")
+
+if (any(str_detect(signame, "age"))) {
+	boxGG <- boxGG + facet_wrap(~ Age, ncol = 3, scales = "free")
+	width <- 6
+} else {width <- 4}
 ggsave(paste(data_dir, signame, "_boxplot_tex_specific_response_all.png", sep = ""), boxGG,
-       dpi = png_res, width = 4, height = 4.5)
+       dpi = png_res, width = width, height = 4.5)
 
 boxGG <- ggplot(plot_scores, aes_string(x = "Res", y = signame)) +
 	geom_boxplot(aes_string(color = "Res"), fill = NA) +
@@ -153,15 +218,19 @@ boxGG <- ggplot(plot_scores, aes_string(x = "Res", y = signame)) +
 		    size = 2.4, alpha = 0.6) +
 	scale_color_manual(values = c("firebrick2","dodgerblue2")) +
 	stat_compare_means(data = plot_scores, mapping = aes_string(group = "Res"), 
-			   label = "p.signif", label.x = 1.35, vjust = 1, method = "kruskal.test") +
+			   label = p_for, label.x = 1.35, vjust = 1, method = "kruskal.test") +
 	labs(y = paste(signame, "signature"), color = "Tamoxifen\nresponses", shape = "Dataset") +
-#	facet_wrap(~ gene, ncol = 7, scales = "free") +
 	theme_bw() +
 	theme(axis.title.x = element_blank(),
 	      axis.text.x = element_text(angle = 45, hjust = 1),
 	      legend.position = "right")
+if (any(str_detect(signame, "age"))) {
+	boxGG <- boxGG + facet_wrap(~ Age, ncol = 3, scales = "free")
+	width <- 6
+} else {width <- 4}
+
 ggsave(paste(data_dir, signame,  "_boxplot_tex_simple_response_all.png", sep = ""), boxGG,
-       dpi = png_res, width = 3, height = 4.5)
+       dpi = png_res, width = width, height = 4.5)
 
 boxGG <- ggplot(plot_scores, aes_string(x = "Res", y = signame)) +
 	geom_boxplot(aes_string(color = "Res"), fill = NA) +
@@ -169,13 +238,18 @@ boxGG <- ggplot(plot_scores, aes_string(x = "Res", y = signame)) +
 		    size = 2.4, alpha = 0.6) +
 	scale_color_manual(values = c("firebrick2","dodgerblue2")) +
 	stat_compare_means(data = plot_scores, mapping = aes_string(group = "Res"), 
-			   label = "p.signif", label.x = 1.35, vjust = 1, method = "kruskal.test") +
+			   label = p_for, label.x = 1.35, vjust = 1, method = "kruskal.test") +
 	labs(y = paste(signame, "signature"), color = "Tamoxifen\nresponses", shape = "Dataset") +
-	facet_wrap(~ GSE, ncol = 2, scales = "free") +
 	theme_bw() +
 	theme(axis.title.x = element_blank(),
 	      axis.text.x = element_text(angle = 45, hjust = 1),
 	      legend.position = "right")
+if (any(str_detect(signame, "age"))) {
+	boxGG <- boxGG + facet_grid(GSE ~ Age, scales = "free") 
+} else {
+	boxGG <- boxGG + facet_wrap(~ GSE, ncol = 3, scales = "free") 
+}
+
 ggsave(paste(data_dir, signame,  "_boxplot_tex_simple_response_split.png", sep = ""), boxGG,
        dpi = png_res, width = 5, height = 4.5)
 
