@@ -456,7 +456,8 @@ visFlag <- FALSE # Visualize results
 subClusterFlag <- FALSE # Re-cluster for each general cell types
 tcrAnaFlag <- FALSE
 monocle3TCR <- FALSE
-specDEFlag <- TRUE
+specDEFlag <- FALSE
+geneDEFlag <- TRUE
 pngRes <- 300
 
 dir.create(file.path(resDir, expID), showWarnings = FALSE)
@@ -777,6 +778,114 @@ if (subClusterFlag) {
 		print(Sys.time()-pst)
 		cat("++++++++++++++++++++++++++++++++++++++++++++++++\n\n")
 	}
+}
+
+if (geneDEFlag) {
+	cat("Run differential expression between specific cohorts...\n")
+	rawObj <- readRDS(paste(intePf, "Seurat_Objects_Clustered.RDS", sep = ""))
+	proObj <- subset(rawObj, idents = c(1, 6, 8, 10, 16))
+	print(proObj)
+	## List for annotate PD-L1 status on TAM
+	texTypes <- c("TEXhigh", "TEXlow")
+	texAnnList <- vector(mode = "list", length = length(texTypes))
+	names(texAnnList) <- texTypes
+	texAnnList[["TEXhigh"]] <- c("BC258", "BC394", "BC397")
+	texAnnList[["TEXlow"]] <- c("BC389", "BC392", "BC393", "BC401")
+
+	proObj@meta.data$TEX <- "high"
+	for (itt in names(texAnnList)) {
+		tmpMask <- proObj@meta.data$patient %in% texAnnList[[itt]]
+		proObj@meta.data[tmpMask, "TEX"] <- itt
+	}
+
+
+	exprOi <- FetchData(proObj, c("MX1", "IFI27"), slot = "data")
+	gathExpr <- gather(exprOi, "gene", "counts", colnames(exprOi))
+	histGG <- ggplot(gathExpr, aes_string(x = "counts", color = "gene")) +
+		geom_histogram(fill = "white", alpha = 0.5, position = "identity", bins = 100) +
+		theme_classic()
+	ggsave(paste(intePf, "histogram_data.png", sep = ""), histGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+	exprOi <- FetchData(proObj, c("MX1", "IFI27"), slot = "counts")
+	gathExpr <- gather(exprOi, "gene", "counts", colnames(exprOi))
+	histGG <- ggplot(gathExpr, aes_string(x = "counts", color = "gene")) +
+		geom_histogram(fill = "white", alpha = 0.5, position = "identity", bins = 100) +
+		theme_classic()
+	ggsave(paste(intePf, "histogram_counts.png", sep = ""), histGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+
+	proObj@meta.data$mx1 <- "N"
+	proObj@meta.data$mx1[exprOi[,1] > 0] <- "MX1"
+	proObj@meta.data$ifi27 <- "N"
+	proObj@meta.data$ifi27[exprOi[,2] > 0] <- "IFI27"
+
+	print(table(proObj@meta.data$TEX, proObj@meta.data$ifi27))
+	print(table(proObj@meta.data$TEX, proObj@meta.data$mx1))
+
+	cat("MX1\n")
+	de_res <- FindMarkers(proObj, ident.1 = "MX1", ident.2 = "N", group.by = "mx1", test.use = "MAST", verbose = TRUE)
+	write.csv(de_res, paste(intePf, "mx1_count_de_all.csv", sep = ""))
+	sig_res <- de_res %>% filter(p_val_adj <= 0.10)
+
+	cat("\tVisualize the top differential expression genes...\n")
+	subObj <- proObj
+	Idents(subObj) <- "mx1"
+	cat("\t\tDot plot...\n")
+	top_features <- c(rownames(sig_res %>% filter(avg_logFC > 0) %>% top_n(20, avg_logFC)), 
+			  rownames(sig_res %>% filter(avg_logFC < 0)%>% top_n(-20, avg_logFC)))
+	dot_gg <- DotPlot(subObj, features = top_features, cols = c("goldenrod", "purple"), 
+			  dot.scale = 8, split.by = "mx1") + RotatedAxis()
+	ggsave(paste(intePf, "mx1_count_dotplot_de_top20.png", sep = ""), dot_gg, dpi = pngRes, width = 12, height = 6)
+	cat("\t\tScatter plot...\n")
+	top_less_features <- c(rownames(sig_res %>% filter(avg_logFC > 0) %>% top_n(5, avg_logFC)), 
+			       rownames(sig_res %>% filter(avg_logFC < 0)%>% top_n(-5, avg_logFC)))
+	avg_expr <- log1p(AverageExpression(subObj, verbose = TRUE)$RNA)
+	avg_expr$logFC <- NA
+	for (ir in rownames(de_res)) {
+		avg_expr[ir, "logFC"] <- de_res[ir, "avg_logFC"]
+	}
+	avg_expr <- avg_expr %>% arrange(desc(is.na(logFC)))
+	sct_gg <- ggplot(avg_expr, aes(x = MX1, y = N)) + 
+		geom_point(aes(color = logFC)) + 
+		theme_classic() + 
+		scale_color_viridis_c() +
+		ggtitle("MX1")
+	sct_gg <- LabelPoints(plot = sct_gg, points = top_less_features, repel = TRUE)
+	ggsave(paste(intePf, "mx1_count_scatter_de_top5.png", sep = ""), sct_gg, dpi = pngRes, width = 4.5, height = 4.5)
+
+	cat("IFI27\n")
+	de_res <- FindMarkers(proObj, ident.1 = "IFI27", ident.2 = "N", group.by = "ifi27", test.use = "MAST", verbose = TRUE)
+	write.csv(de_res, paste(intePf, "ifi27_count_de_all.csv", sep = ""))
+	sig_res <- de_res %>% filter(p_val_adj <= 0.10)
+
+	cat("\tVisualize the top differential expression genes...\n")
+	subObj <- proObj
+	Idents(subObj) <- "ifi27"
+	cat("\t\tDot plot...\n")
+	top_features <- c(rownames(sig_res %>% filter(avg_logFC > 0) %>% top_n(20, avg_logFC)), 
+			  rownames(sig_res %>% filter(avg_logFC < 0)%>% top_n(-20, avg_logFC)))
+	dot_gg <- DotPlot(subObj, features = top_features, cols = c("goldenrod", "purple"), 
+			  dot.scale = 8, split.by = "ifi27") + RotatedAxis()
+	ggsave(paste(intePf, "ifi27_count_dotplot_de_top20.png", sep = ""), dot_gg, dpi = pngRes, width = 12, height = 6)
+	cat("\t\tScatter plot...\n")
+	top_less_features <- c(rownames(sig_res %>% filter(avg_logFC > 0) %>% top_n(5, avg_logFC)), 
+			       rownames(sig_res %>% filter(avg_logFC < 0)%>% top_n(-5, avg_logFC)))
+	avg_expr <- log1p(AverageExpression(subObj, verbose = TRUE)$RNA)
+	avg_expr$logFC <- NA
+	for (ir in rownames(de_res)) {
+		avg_expr[ir, "logFC"] <- de_res[ir, "avg_logFC"]
+	}
+	avg_expr <- avg_expr %>% arrange(desc(is.na(logFC)))
+	sct_gg <- ggplot(avg_expr, aes(x = IFI27, y = N)) + 
+		geom_point(aes(color = logFC)) + 
+		theme_classic() + 
+		scale_color_viridis_c() +
+		ggtitle("IFI27")
+	sct_gg <- LabelPoints(plot = sct_gg, points = top_less_features, repel = TRUE)
+	ggsave(paste(intePf, "ifi27_count_scatter_de_top5.png", sep = ""), sct_gg, dpi = pngRes, width = 4.5, height = 4.5)
+
 }
 
 if (specDEFlag) {
