@@ -784,6 +784,7 @@ if (geneDEFlag) {
 	cat("Run differential expression between specific cohorts...\n")
 	rawObj <- readRDS(paste(intePf, "Seurat_Objects_Clustered.RDS", sep = ""))
 	proObj <- subset(rawObj, idents = c(1, 6, 8, 10, 16))
+	intePf <- paste(intePf, "ER_only_", sep = "")
 	print(proObj)
 	## List for annotate PD-L1 status on TAM
 	texTypes <- c("TEXhigh", "TEXlow")
@@ -798,6 +799,7 @@ if (geneDEFlag) {
 		proObj@meta.data[tmpMask, "TEX"] <- itt
 	}
 
+	proObj <- subset(proObj, subset = patient == "BC394", invert = TRUE)
 
 	exprOi <- FetchData(proObj, c("MX1", "IFI27"), slot = "data")
 	gathExpr <- gather(exprOi, "gene", "counts", colnames(exprOi))
@@ -923,6 +925,8 @@ if (specDEFlag) {
 	## Subset 
 	rawObj <- proObj
 	proObj <- subset(rawObj, idents = c(1, 6, 8, 10, 16))
+	proObj <- subset(proObj, subset = patient == "BC394", invert = TRUE)
+	intePf <- paste(intePf, "ER_only_", sep = "")
 	texCol <- c("dodgerblue", "firebrick")
 
 	cat("Vln plot visualization for gene of interest...\n")
@@ -1023,6 +1027,7 @@ if (specDEFlag) {
 	gar <- dev.off()
 
 	proObj <- subset(rawObj, idents = c(1, 6, 8, 16))
+	proObj <- subset(proObj, subset = patient == "BC394", invert = TRUE)
 	texCol <- c("dodgerblue", "firebrick")
 
 	cat("Start to run DE analysis -- Wilcox\n")
