@@ -801,6 +801,17 @@ if (geneDEFlag) {
 
 	proObj <- subset(proObj, subset = patient == "BC394", invert = TRUE)
 
+	ifnrs <- c("IFNAR1", "IFNAR2", "IFNGR1", "IFNGR2")
+	ifnrGG <- FeaturePlot(proObj, features = ifnrs, split.by = "TEX", order = TRUE)
+	ggsave(paste(intePf, "ifnrs_umap_split.png", sep = ""), ifnrGG,
+	       dpi = pngRes, width = 9, height = 12)
+
+	ifnrGG <- FeaturePlot(proObj, features = ifnrs, order = TRUE)
+	ggsave(paste(intePf, "ifnrs_umap.png", sep = ""), ifnrGG,
+	       dpi = pngRes, width = 9, height = 6)
+
+	q(save = "no")
+
 	exprOi <- FetchData(proObj, c("MX1", "IFI27"), slot = "data")
 	gathExpr <- gather(exprOi, "gene", "counts", colnames(exprOi))
 	histGG <- ggplot(gathExpr, aes_string(x = "counts", color = "gene")) +
