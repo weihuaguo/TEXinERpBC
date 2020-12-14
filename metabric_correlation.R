@@ -14,7 +14,7 @@ suppressMessages(library(gridExtra))
 data_dir <- "C:/Users/wguo/Documents/temp_work_athome/"
 res_dir <- "C:/Users/wguo/Documents/temp_work_athome/metabric_corr/"
 input_df <- read.csv(paste(data_dir, "correlation_matrix_complete.csv", sep = ""), header = T, row.names = 1)
-subtype <- "TNBC"
+subtype <- "ER"
 
 cate_cols <- c("menopause_state","grade","stage","PR.expr", "pam50", "chemotherapy")
 for (icc in cate_cols) {
@@ -40,8 +40,8 @@ all_comb <- combn(all_cols, 2)
 plot_list <- vector(mode = "list", length = ncol(all_comb))
 names(plot_list) <- 1:ncol(all_comb)
 
-plot_df <- input_df[input_df$subtype == "TNBC",]
-plotPf <- paste(res_dir, "TNBC_", sep = "")
+plot_df <- input_df[input_df$subtype == "ER+",]
+plotPf <- paste(res_dir, "ER_", sep = "")
 
 if (subtype == "TNBC") {
   cat("Forest plot...\n")
@@ -148,14 +148,19 @@ for (ic in 1:ncol(all_comb)) {
       geom_boxplot(aes_string(color = x_name)) +
       geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 2.4, aes_string(color = x_name)) +
       stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova") +
-      theme_classic()
+      theme_classic() +
+      theme(axis.text=element_text(size=5.67, color = "#000000"),
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+
   }
   if (x_name %in% num_cols & y_name %in% cate_cols) {
     tmp_gg <- ggplot(plot_df, aes_string(x = x_name, y = y_name)) +
       geom_boxplot(aes_string(color = x_name)) +
       geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 2.4, aes_string(color = x_name)) +
       stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova") +
-      theme_classic()
+      theme_classic() +
+      theme(axis.text=element_text(size=5.67, color = "#000000"),
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
   }
   if (x_name %in% cate_cols & y_name %in% cate_cols) {
     cat("Both categorical\n")
@@ -177,7 +182,10 @@ for (ic in 1:ncol(all_comb)) {
       scale_fill_brewer(palette = "Paired") + 
       labs(y = "Patient number") +
       annotate("text", x = 2, y = 2*max(tmp_table$num), label = pflag) + 
-      theme_classic()
+      theme_classic() +
+      theme(axis.text=element_text(size=5.67, color = "#000000"),
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+
   }
   
   if (x_name %in% num_cols & y_name %in% num_cols) {
@@ -186,11 +194,15 @@ for (ic in 1:ncol(all_comb)) {
                         size = 0.6, add = "reg.line", conf.int = TRUE, alpha = 0.54,
                         add.params = list(color = "blue", fill = "lightgray")) +
       stat_cor(method = "pearson") +
-      theme_classic()
+      theme_classic() +
+      theme(axis.text=element_text(size=5.67, color = "#000000"),
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+
   }
   plot_list[[ic]] <- tmp_gg
+  ggsave(paste(plotPf, x_name, "_vs_",y_name, "_specific_correlation_triangle.png", sep = ""), tmp_gg, dpi = 300, width = 2, height = 1.5)
 }
 
 tri_gg <- grid.arrange(grobs = plot_list, layout_matrix = plot_m)
-ggsave(paste(plotPf, "specific_correlation_triangle.pdf", sep = ""), tri_gg, dpi = 300, width = 54, height = 42, limitsize = FALSE)
-ggsave(paste(plotPf, "specific_correlation_triangle.png", sep = ""), tri_gg, dpi = 300, width = 54, height = 42, limitsize = FALSE)
+ggsave(paste(plotPf, "specific_correlation_triangle.pdf", sep = ""), tri_gg, dpi = 300, width = 27, height = 21, limitsize = FALSE)
+ggsave(paste(plotPf, "specific_correlation_triangle.png", sep = ""), tri_gg, dpi = 300, width = 27, height = 21, limitsize = FALSE)
