@@ -41,7 +41,7 @@ plot_list <- vector(mode = "list", length = ncol(all_comb))
 names(plot_list) <- 1:ncol(all_comb)
 
 plot_df <- input_df[input_df$subtype == "ER+",]
-plotPf <- paste(res_dir, "ER_", sep = "")
+plotPf <- paste(res_dir, "ER_vln_", sep = "")
 
 if (subtype == "TNBC") {
   cat("Forest plot...\n")
@@ -143,24 +143,30 @@ for (ic in 1:ncol(all_comb)) {
   y_name <- all_comb[2, ic]
   cat("\tx:", x_name, "\ty:", y_name, "\n")
   if (x_name %in% cate_cols & y_name %in% num_cols) {
-    cat("\t\tMixed situation...\n")
+    cat("Mixed situation...\n")
     tmp_gg <- ggplot(plot_df, aes_string(x = x_name, y = y_name)) +
-      geom_boxplot(aes_string(color = x_name)) +
-      geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 2.4, aes_string(color = x_name)) +
-      stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova") +
+      geom_violin(aes_string(fill = x_name)) +
+#      geom_boxplot(aes_string(color = x_name)) +
+#      geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 1.2, aes_string(color = x_name)) +
+      stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova", size=5.67) +
       theme_classic() +
       theme(axis.text=element_text(size=5.67, color = "#000000"),
-	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'),
+	    legend.text=element_text(size=5.67),
+	    legend.title = element_blank())
 
   }
   if (x_name %in% num_cols & y_name %in% cate_cols) {
     tmp_gg <- ggplot(plot_df, aes_string(x = x_name, y = y_name)) +
-      geom_boxplot(aes_string(color = x_name)) +
-      geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 2.4, aes_string(color = x_name)) +
-      stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova") +
+      geom_violin(aes_string(fill = x_name)) +
+#      geom_boxplot(aes_string(color = x_name)) +
+#      geom_jitter(position = position_jitterdodge(0.2), alpha = 0.54, size = 1.2, aes_string(color = x_name)) +
+      stat_compare_means(label = "p.signif", label.x = 1.35, method = "anova", size=5.67) +
       theme_classic() +
       theme(axis.text=element_text(size=5.67, color = "#000000"),
-	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'),
+	    legend.text=element_text(size=5.67), 
+	    legend.title = element_blank())
   }
   if (x_name %in% cate_cols & y_name %in% cate_cols) {
     cat("Both categorical\n")
@@ -181,28 +187,32 @@ for (ic in 1:ncol(all_comb)) {
       geom_bar(stat = "identity", position = position_stack(), aes_string(fill = y_name)) +
       scale_fill_brewer(palette = "Paired") + 
       labs(y = "Patient number") +
-      annotate("text", x = 2, y = 2*max(tmp_table$num), label = pflag) + 
+      annotate("text", x = 2, y = 1.1*max(tmp_table$num), label = pflag, size=2) + 
       theme_classic() +
       theme(axis.text=element_text(size=5.67, color = "#000000"),
-	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'),
+	    legend.text=element_text(size=5.67),
+	    legend.title = element_blank())
 
   }
   
   if (x_name %in% num_cols & y_name %in% num_cols) {
     cat("Both numericals\n")
     tmp_gg <- ggscatter(plot_df, x = x_name, y = y_name, color = "firebrick",
-                        size = 0.6, add = "reg.line", conf.int = TRUE, alpha = 0.54,
+                        size = 0.3, add = "reg.line", conf.int = TRUE, alpha = 0.54,
+                        cor.coef = TRUE, cor.coef.size=2, cor.coeff.args = list(method = "pearson"),
                         add.params = list(color = "blue", fill = "lightgray")) +
-      stat_cor(method = "pearson") +
+#      stat_cor(method = "pearson") +
       theme_classic() +
       theme(axis.text=element_text(size=5.67, color = "#000000"),
-	    axis.title=element_text(size=5.67, color = "#000000", face='bold'))
-
+	    axis.title=element_text(size=5.67, color = "#000000", face='bold'),
+	    legend.text=element_text(size=5.67),
+	    legend.title = element_blank())
   }
   plot_list[[ic]] <- tmp_gg
-  ggsave(paste(plotPf, x_name, "_vs_",y_name, "_specific_correlation_triangle.png", sep = ""), tmp_gg, dpi = 300, width = 2, height = 1.5)
+  ggsave(paste(plotPf, x_name, "_vs_",y_name, "_specific_correlation_triangle.png", sep = ""), tmp_gg, dpi = 300, width = 3, height = 2)
 }
 
 tri_gg <- grid.arrange(grobs = plot_list, layout_matrix = plot_m)
-ggsave(paste(plotPf, "specific_correlation_triangle.pdf", sep = ""), tri_gg, dpi = 300, width = 27, height = 21, limitsize = FALSE)
-ggsave(paste(plotPf, "specific_correlation_triangle.png", sep = ""), tri_gg, dpi = 300, width = 27, height = 21, limitsize = FALSE)
+ggsave(paste(plotPf, "specific_correlation_triangle.pdf", sep = ""), tri_gg, dpi = 300, width = 32, height = 21, limitsize = FALSE)
+ggsave(paste(plotPf, "specific_correlation_triangle.png", sep = ""), tri_gg, dpi = 300, width = 32, height = 21, limitsize = FALSE)
