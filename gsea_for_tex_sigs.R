@@ -21,7 +21,11 @@ fgsea_tidy <- as.data.frame(fgseaRes %>% arrange(padj))
 
 print(fgsea_tidy)
 for (gs in names(tex_pub_sigs)) {
-	en_gg <- plotEnrichment(tex_pub_sigs[[gs]], tex_sig) + labs(title=gs)
+	en_gg <- plotEnrichment(tex_pub_sigs[[gs]], tex_sig) + 
+		labs(title=gs) +
+		theme(axis.text=element_text(size=5.67, color = "#000000"),
+		      axis.title=element_text(size=5.67, color = "#000000"),
+		      plot.title=element_text(size=6, color = "#000000", face='bold'))
 	ggsave(paste(gmt_dir, "/", gs, "_enrichment_plot.png", sep = ""), en_gg,
-	       dpi=300, width=6, height=4)
+	       dpi=300, width=2, height=1.5)
 }
