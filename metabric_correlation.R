@@ -135,7 +135,8 @@ cor_gg <- ggplot(cor_res, aes(x = reorder(V1, -V1C), y = reorder(V2, -V2C))) +
         axis.title = element_blank(),
         legend.position = "right")
 ggsave(paste(plotPf, "correlation_dotplot_triangle.png", sep = ""), cor_gg, dpi = 300, width = 7.2, height = 6, limitsize = FALSE)
-
+write.csv(cor_res, paste(plotPf, "correlation_results.csv", sep = ""))
+stop("HERE")
 
 cat("One-to-one visualization...\n")
 for (ic in 1:ncol(all_comb)) {
