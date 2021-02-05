@@ -4,12 +4,15 @@
 
 rm(list = ls())
 suppressMessages(library(dplyr))
+suppressMessages(library(tidyr))
 suppressMessages(library(ggplot2))
 suppressMessages(library(ggpubr))
+suppressMessages(library(stringr))
 suppressMessages(library(cocor))
 suppressMessages(library(survminer))
 suppressMessages(library(survival))
 suppressMessages(library(survMisc))
+suppressMessages(library(rstatix))
 
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
@@ -27,25 +30,65 @@ forest_gg <- ggforest(fit)
 ggsave(paste(data_dir, 'all_together_rfs_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 4)
 
 
-cat('\tPre\n')
-use_df <- pre_df
-meno_state <- 'pre'
+
+use_df <- df
+meno_state <- 'all'
+cat('\t', meno_state, '\n')
 use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.75), 'High', 
                             ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.25), 'Low', 'Medium'))
 use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
                            ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
+use_df$hhll <- str_c('Tex:', use_df$group_tex, '-Oncotype:', use_df$group_onco)
 
+cat('\t\tFour group....\n')
+hhll_df <- use_df[use_df$group_tex != 'Medium' & use_df$group_onco != 'Medium',]
+fit <- survfit(Surv(ost, ose) ~ hhll, data = hhll_df)
+surv_gg <- ggsurvplot(fit, data = hhll_df, pval = TRUE,
+                      title = meno_state, legend = 'right', legend.title = 'Combined groups')
+png(paste(data_dir, meno_state, '_os_hhll.png', sep = ''), res = 600, width = 9, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ hhll, data = hhll_df)
+surv_gg <- ggsurvplot(fit, data = hhll_df, pval = TRUE,
+                      title = meno_state, legend = 'right', legend.title = 'Combined groups')
+png(paste(data_dir, meno_state, '_rfs_hhll.png', sep = ''), res = 600, width = 9, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+cat('\t\tCutP\n')
 tex_coxph <- coxph(Surv(ost, ose) ~ Tex, data = use_df)
 tex_coxph <- cutp(tex_coxph)$Tex
-colnames(tex_coxph)[2:ncol(tex_coxph)] <- paste('tex_', colnames(tex_coxph)[2:ncol(tex_coxph)], sep = '')
 merge_tex_cutp <- merge(tex_coxph, use_df, by = 'Tex')
+merge_tex_cutp$sig <- 'Tex score'
+merge_tex_cutp$stype <- 'OS'
 onco_coxph <- coxph(Surv(ost, ose) ~ oncotype, data = use_df)
 onco_coxph <- cutp(onco_coxph)$oncotype
-colnames(onco_coxph)[2:ncol(onco_coxph)] <- paste('onco_', colnames(onco_coxph)[2:ncol(onco_coxph)], sep = '')
 merge_onco_cutp <- merge(onco_coxph, use_df, by = 'oncotype')
-merge_cutp <- merge(merge_tex_cutp, merge_onco_cutp, by = 'pid')
+merge_onco_cutp$sig <- 'Oncotype DX'
+merge_onco_cutp$stype <- 'OS'
+merge_cutp <- rbind(merge_tex_cutp, merge_onco_cutp)
 
-cor_gg <- ggscatter(merge_cutp, x='tex_U', y = 'onco_U', 
+tex_mean <- mean(merge_cutp$U[merge_cutp$sig == 'Tex score'])
+
+onco_time <- mean(use_df$Tex/use_df$oncotype)
+onco_mean <- mean(merge_cutp$U[merge_cutp$sig == 'Oncotype DX'])
+
+use_df$comb <- use_df$Tex*tex_mean + use_df$oncotype*onco_mean*onco_time
+
+hybrid_coxph <- coxph(Surv(ost, ose) ~ comb, data = use_df)
+hybrid_coxph <- cutp(hybrid_coxph)$comb
+merge_hybrid_cutp <- merge(hybrid_coxph, use_df, by = 'comb')
+merge_hybrid_cutp$sig <- 'Hybrid'
+merge_hybrid_cutp$stype <- 'OS'
+merge_hybrid_cutp$comb <- NULL
+merge_cutp <- rbind(merge_cutp, merge_hybrid_cutp)
+
+use_df$group_comb <- ifelse(use_df$comb > quantile(use_df$comb, 0.75), 'High', 
+                           ifelse(use_df$comb < quantile(use_df$comb, 0.25), 'Low', 'Medium'))
+
+spr_cutp <- spread(merge_cutp[, c('pid', 'U', 'sig', 'Tex', 'oncotype')], 'sig', 'U')
+cor_gg <- ggscatter(spr_cutp, x='Tex score', y = 'Oncotype DX', 
                     size = 1, alpha = 0.3,
                     add = 'reg.line',
                     conf.int = TRUE, 
@@ -54,9 +97,20 @@ cor_gg <- ggscatter(merge_cutp, x='tex_U', y = 'onco_U',
   labs(y = 'log-rank score\n(Oncotype DX)', x = 'log-rank score\n(Tex)') +
   theme_classic() +
   theme(legend.position = 'bottom')
-ggsave(paste(data_dir, meno_state, '_cutp_correlation.png', sep = ''), cor_gg, dpi = 600, width = 6, height = 4)
-stop('TEST')
+ggsave(paste(data_dir, meno_state, '_os_cutp_correlation.png', sep = ''), cor_gg, dpi = 600, width = 6, height = 4)
 
+comps <- list(c('Tex score', 'Oncotype DX'), c('Tex score', 'Hybrid'), c('Oncotype DX', 'Hybrid'))
+box_gg <- ggplot(merge_cutp, aes(x = sig, y = U, color = Tex)) +
+  geom_boxplot() +
+  geom_point(position = position_jitterdodge(0.3)) +
+  stat_compare_means(label = 'p.signif', comparisons = comps) +
+  scale_color_distiller(palette = 'RdYlBu') +
+  labs(x = 'Signatures', y = 'log-rank score', fill = 'Tex', title = meno_state) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+ggsave(paste(data_dir, meno_state, '_os_cutp_box.png', sep = ''), box_gg, dpi = 600, width = 3, height = 4)
+
+cat('\t\tGroup counts...\n')
 group_cts <- as.data.frame(table(use_df$group_onco, use_df$group_tex))
 colnames(group_cts) <- c('Oncotype', 'Tex', 'Num')
 cts_gg <- ggplot(group_cts, aes_string(x = 'Tex', y = 'Oncotype', color = 'Num', size = 'Num')) +
@@ -67,13 +121,82 @@ cts_gg <- ggplot(group_cts, aes_string(x = 'Tex', y = 'Oncotype', color = 'Num',
   theme(legend.position = 'top')
 ggsave(paste(data_dir, meno_state, '_group_onco_vs_tex.png', sep = ''), cts_gg, dpi = 600, width = 6, height = 3)
 
-fit <- coxph(Surv(ost, ose) ~ group_tex + group_onco, data = use_df)
+cat('\t\tForest plot...MANUALLL\n')
+#https://www.r-bloggers.com/2016/12/cox-proportional-hazards-model/
+covariates <- c("Tex", "oncotype",  "comb")
+univ_formulas <- sapply(covariates,
+                        function(x) as.formula(paste('Surv(ost, ose)~', x)))
+
+univ_models <- lapply( univ_formulas, function(x){coxph(x, data = use_df)})
+# Extract data 
+univ_results <- lapply(univ_models,
+                       function(x){ 
+                         x <- summary(x)
+                         p.value<-signif(x$logtest["pvalue"], digits=2)
+                         logrank.test<-signif(x$logtest["test"], digits=2)
+                         beta<-signif(x$coef[1], digits=2);#coeficient beta
+                         HR <-signif(x$coef[2], digits=2);#exp(beta)
+                         HR.confint.lower <- signif(x$conf.int[,"lower .95"], 2)
+                         HR.confint.upper <- signif(x$conf.int[,"upper .95"],2)
+                         res<-c(beta, HR, HR.confint.lower,HR.confint.upper, logrank.test, p.value)
+                         names(res)<-c("beta", "HR", "HRL", "HRU", "logrank", "p.value")
+                         return(res)
+                         #return(exp(cbind(coef(x),confint(x))))
+                       })
+res <- as.data.frame(t(as.data.frame(univ_results, check.names = FALSE)))
+res$sig <- c('Tex', 'OncotypeDX', 'Hybrid')
+res$p_format <- str_c('p-val = ', res$p.value)
+
+form_gg <- ggplot(res, aes(x = HR, y = sig)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = HRL, xmax = HRU), width = 0.2) +
+  geom_vline(xintercept = 1.0, linetype = 'dashed', color = 'red') +
+  geom_text(aes(label = p_format), hjust = -1, vjust = -1.5) +
+  labs(x = 'Hazard ratio (univariant tests, overall survival)', y = 'Signatures') +
+  theme_classic()
+ggsave(paste(data_dir, meno_state, '_os_hr.png', sep = ''), form_gg, dpi = 600, width = 6, height = 3)
+
+univ_formulas <- sapply(covariates,
+                        function(x) as.formula(paste('Surv(rfst, rfse)~', x)))
+
+univ_models <- lapply( univ_formulas, function(x){coxph(x, data = use_df)})
+# Extract data 
+univ_results <- lapply(univ_models,
+                       function(x){ 
+                         x <- summary(x)
+                         p.value<-signif(x$logtest["pvalue"], digits=2)
+                         logrank.test<-signif(x$logtest["test"], digits=2)
+                         beta<-signif(x$coef[1], digits=2);#coeficient beta
+                         HR <-signif(x$coef[2], digits=2);#exp(beta)
+                         HR.confint.lower <- signif(x$conf.int[,"lower .95"], 2)
+                         HR.confint.upper <- signif(x$conf.int[,"upper .95"],2)
+                         res<-c(beta, HR, HR.confint.lower,HR.confint.upper, logrank.test, p.value)
+                         names(res)<-c("beta", "HR", "HRL", "HRU", "logrank", "p.value")
+                         return(res)
+                         #return(exp(cbind(coef(x),confint(x))))
+                       })
+res <- as.data.frame(t(as.data.frame(univ_results, check.names = FALSE)))
+res$sig <- c('Tex', 'OncotypeDX', 'Hybrid')
+res$p_format <- str_c('p-val = ', res$p.value)
+
+form_gg <- ggplot(res, aes(x = HR, y = sig)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = HRL, xmax = HRU), width = 0.2) +
+  geom_vline(xintercept = 1.0, linetype = 'dashed', color = 'red') +
+  geom_text(aes(label = p_format), hjust = -1, vjust = -1.5) +
+  labs(x = 'Hazard ratio (univariant tests, relapse-free survival)', y = 'Signatures') +
+  theme_classic()
+ggsave(paste(data_dir, meno_state, '_rfs_hr.png', sep = ''), form_gg, dpi = 600, width = 6, height = 3)
+
+if (FALSE) {
+fit <- coxph(Surv(ost, ose) ~ oncotype, data = use_df)
 forest_gg <- ggforest(fit)
 ggsave(paste(data_dir, meno_state, '_os_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 3)
 
-fit <- coxph(Surv(rfst, rfse) ~ group_tex + group_onco, data = use_df)
+fit <- coxph(Surv(rfst, rfse) ~ Tex + oncotype, data = use_df)
 forest_gg <- ggforest(fit)
 ggsave(paste(data_dir, meno_state, '_rfs_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 3)
+}
 
 cat('\t\tTex\n')
 tex_df <- use_df[use_df$group_tex != 'Medium',]
@@ -115,69 +238,23 @@ png(paste(data_dir, meno_state, '_rfs_oncotype.png', sep = ''), res = 600, width
 print(surv_gg)
 gar <- dev.off()
 
-cat('\tPost\n')
-use_df <- post_df
-meno_state <- 'post'
-use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.75), 'High', 
-                            ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.25), 'Low', 'Medium'))
-use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
-                           ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
-
-group_cts <- as.data.frame(table(use_df$group_onco, use_df$group_tex))
-colnames(group_cts) <- c('Oncotype', 'Tex', 'Num')
-cts_gg <- ggplot(group_cts, aes_string(x = 'Tex', y = 'Oncotype', color = 'Num', size = 'Num')) +
-  geom_point() +
-  scale_color_distiller(palette = 'Spectral') +
-  labs(title = meno_state) +
-  theme_bw() +
-  theme(legend.position = 'top')
-ggsave(paste(data_dir, meno_state, '_group_onco_vs_tex.png', sep = ''), cts_gg, dpi = 600, width = 6, height = 3)
-
-fit <- coxph(Surv(ost, ose) ~ group_tex + group_onco, data = use_df)
-forest_gg <- ggforest(fit)
-ggsave(paste(data_dir, meno_state, '_os_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 3)
-
-fit <- coxph(Surv(rfst, rfse) ~ group_tex + group_onco, data = use_df)
-forest_gg <- ggforest(fit)
-ggsave(paste(data_dir, meno_state, '_rfs_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 3)
-
-cat('\t\tTex\n')
-tex_df <- use_df[use_df$group_tex != 'Medium',]
-fit <- survfit(Surv(ost, ose) ~ group_tex, data = tex_df)
+cat('\t\tComb\n')
+tex_df <- use_df[use_df$group_comb != 'Medium',]
+fit <- survfit(Surv(ost, ose) ~ group_comb, data = tex_df)
 surv_gg <- ggsurvplot(fit, data = tex_df, pval = TRUE,
                       title = meno_state,
-                      legend.title = 'Tex',
+                      legend.title = 'Hybrid',
                       legend.labs = c('High', 'Low'))
-png(paste(data_dir, meno_state, '_os_tex.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
+png(paste(data_dir, meno_state, '_os_hybrid.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 
-fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = tex_df)
+fit <- survfit(Surv(rfst, rfse) ~ group_comb, data = tex_df)
 surv_gg <- ggsurvplot(fit, data = tex_df, pval = TRUE,
                       title = meno_state,
-                      legend.title = 'Tex',
+                      legend.title = 'Hybrid',
                       legend.labs = c('High', 'Low'))
-png(paste(data_dir, meno_state, '_rfs_tex.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
-print(surv_gg)
-gar <- dev.off()
-
-cat('\t\tOncotype DX\n')
-tex_df <- use_df[use_df$group_onco != 'Medium',]
-fit <- survfit(Surv(ost, ose) ~ group_onco, data = tex_df)
-surv_gg <- ggsurvplot(fit, data = tex_df, pval = TRUE,
-                      title = meno_state,
-                      legend.title = 'Oncotype DX',
-                      legend.labs = c('High', 'Low'))
-png(paste(data_dir, meno_state, '_os_oncotype.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
-print(surv_gg)
-gar <- dev.off()
-
-fit <- survfit(Surv(rfst, rfse) ~ group_onco, data = tex_df)
-surv_gg <- ggsurvplot(fit, data = tex_df, pval = TRUE,
-                      title = meno_state,
-                      legend.title = 'Oncotype DX',
-                      legend.labs = c('High', 'Low'))
-png(paste(data_dir, meno_state, '_rfs_oncotype.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
+png(paste(data_dir, meno_state, '_rfs_hybrid.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 
