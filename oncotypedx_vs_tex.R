@@ -32,12 +32,37 @@ ggsave(paste(data_dir, 'all_together_rfs_hr.png', sep = ''), forest_gg, dpi = 60
 
 
 use_df <- df
-meno_state <- 'all'
+meno_state <- 'all80'
 cat('\t', meno_state, '\n')
-use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.75), 'High', 
-                            ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.25), 'Low', 'Medium'))
+use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.80), 'High', 
+                            ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
+use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.80), 'High', 'Medium')
 use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
                            ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
+
+tmp_df <- use_df[use_df$group_onco == 'Medium',]
+tmp_df <- tmp_df[tmp_df$group_tex != 'Medium',]
+
+cat('\t\tTex\n')
+fit <- survfit(Surv(ost, ose) ~ group_tex, data = tmp_df)
+surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
+                      title = meno_state,
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'))
+png(paste(data_dir, meno_state, '_os_tex_oncomedium.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = tmp_df)
+surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
+                      title = meno_state,
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'))
+png(paste(data_dir, meno_state, '_rfs_tex_oncomedium.png', sep = ''), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+stop("TEST")
+
 use_df$hhll <- str_c('Tex:', use_df$group_tex, '-Oncotype:', use_df$group_onco)
 
 cat('\t\tFour group....\n')
