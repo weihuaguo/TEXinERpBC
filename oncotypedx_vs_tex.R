@@ -18,6 +18,11 @@ data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_w
 bc_type <- 'ER'
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
+df$oncotype_unscale <- df$oncotype
+latest_onco <- read.csv(paste(data_dir, 'oncotype_function_sigscore_', bc_type, '_cbpt_allmatch.csv', sep = ''), row.names = 1)
+df$oncotype_scale <- latest_onco[rownames(df),'sigscore']
+plot(df$oncotype_scale, df$oncotype_unscale)
+
 pre_df <- df[df$menopausal_State == 'pre',]
 post_df <- df[df$menopausal_State == 'post',]
 cat('Hazard ratio...\n')
