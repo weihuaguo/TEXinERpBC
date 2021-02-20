@@ -17,8 +17,8 @@ suppressMessages(library(rstatix))
 
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
-meno_status <- 'pre'
-onco_status <- 'low-int'
+meno_status <- 'all'
+onco_status <- 'high'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
 
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
@@ -240,7 +240,7 @@ print(surv_gg)
 gar <- dev.off()
 
 stop("TEST")
-#############################
+#############################SEPARATION####
 
 
 
