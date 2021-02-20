@@ -9,6 +9,7 @@ suppressMessages(library(ggplot2))
 suppressMessages(library(ggpubr))
 suppressMessages(library(stringr))
 suppressMessages(library(cocor))
+suppressMessages(library(scales))
 suppressMessages(library(survminer))
 suppressMessages(library(survival))
 suppressMessages(library(survMisc))
@@ -16,12 +17,244 @@ suppressMessages(library(rstatix))
 
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
+meno_status <- 'pre'
+onco_status <- 'low-int'
+plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
+
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
 df$oncotype_unscale <- df$oncotype
 latest_onco <- read.csv(paste(data_dir, 'oncotype_function_sigscore_', bc_type, '_cbpt_allmatch.csv', sep = ''), row.names = 1)
 df$oncotype_scale <- latest_onco[rownames(df),'sigscore']
-plot(df$oncotype_scale, df$oncotype_unscale)
+
+clinical_df <- read.csv(paste(data_dir, 'brca_metabric_clinical_data.csv', sep = ''), header = T, row.names = 1,
+                          check.names = T)
+rownames(clinical_df) <- str_replace(rownames(clinical_df), '-', '.')
+
+cat("Compare the actual and in-house oncotype Dx...\n")
+onco_comp_sct <- ggscatter(df, x = 'oncotype_unscale', y = 'oncotype_scale',
+                           add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                           conf.int = TRUE) +
+  stat_cor(method = 'pearson') +
+  geom_vline(xintercept = quantile(df$oncotype_unscale, c(0.15, 0.85))) +
+  geom_hline(yintercept = c(11,25), color = 'red') +
+  geom_hline(yintercept = quantile(df$oncotype_scale, c(0.15, 0.85)))
+plot_pf <- paste(data_dir, 'final_02192021', sep = '')
+ggsave(paste(plot_pf, 'oncotype_compare_scatter.png', sep = ''), onco_comp_sct,
+       dpi = 600, width = 6, height = 6)
+
+onco_comp_hists <- ggplot(df, aes(x = oncotype_scale)) + 
+  geom_histogram(fill = 'skyblue', color = 'blue', bins = 81) +
+  geom_vline(xintercept = c(11,25), color = 'red') +
+  geom_vline(xintercept = quantile(df$oncotype_scale, c(0.15, 0.85))) +
+  labs(title = 'Potential actual oncotype DX') + theme_classic()
+
+onco_comp_histu <- ggplot(df, aes(x = oncotype_unscale)) + 
+  geom_histogram(fill = 'skyblue', color = 'blue', bins = 81) +
+  geom_vline(xintercept = quantile(df$oncotype_unscale, c(0.15, 0.85))) +
+  labs(title = 'Oncotype Dx from sig.score') + theme_classic()
+
+onco_comp_hist <- ggarrange(onco_comp_hists, onco_comp_histu, ncol = 1, nrow = 2)
+
+ggsave(paste(plot_pf, 'oncotype_compare_histogram.png', sep = ''), onco_comp_hist,
+       dpi = 600, width = 6, height = 6)
+
+plot_pf <- paste(plot_pf, bc_type, meno_status, 'onco', onco_status, sep = '_')
+if (meno_status == 'pre') {
+  use_df <- df[df$menopausal_State == 'pre',]
+} else if (meno_status == 'post') {
+  use_df <- df[df$menopausal_State == 'post',]  
+} else {use_df <- df}
+
+use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.85), 'High', 
+                            ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
+use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
+                           ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
+
+if (onco_status == 'high') {
+  tmp_df <- use_df[use_df$group_onco == 'High',]
+} else if (onco_status == 'low') {
+  tmp_df <- use_df[use_df$group_onco == 'Low',]
+} else if (onco_status == 'int') {
+  tmp_df <- use_df[use_df$group_onco == 'Medium',]
+} else {
+  tmp_df <- use_df[use_df$group_onco != 'High',]
+}
+
+colnames(clinical_df)
+clin_cols <- c("Age.at.Diagnosis", "Chemotherapy", "Lymph.nodes.examined.positive", 
+               "Tumor.Size", "Tumor.Stage", "Neoplasm.Histologic.Grade")
+use_clin <- clinical_df[,clin_cols]
+tmp_df <- cbind(tmp_df, use_clin[rownames(tmp_df),])
+tmp_df$Tumor.Stage <- as.factor(tmp_df$Tumor.Stage)
+tmp_df$Neoplasm.Histologic.Grade <- as.factor(tmp_df$Neoplasm.Histologic.Grade)
+tmp_df$Chemotherapy <- as.factor(tmp_df$Chemotherapy)
+
+all_tmp_df <- tmp_df
+tmp_df <- tmp_df[tmp_df$group_tex != 'Medium',]
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(ost, ose) ~ Lymph.nodes.examined.positive+Age.at.Diagnosis+Tumor.Size+Tumor.Stage+Neoplasm.Histologic.Grade+Tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_hr_os.png', sep = '_'), forest_gg, dpi = 600, width = 9, height = 6)
+
+fit <- coxph(Surv(rfst, rfse) ~ Age.at.Diagnosis+Lymph.nodes.examined.positive+Tumor.Size+Tumor.Stage+Neoplasm.Histologic.Grade+Tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_hr_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 9, height = 6)
+
+cat('\t\tForest plot...Univariant\n')
+#https://www.r-bloggers.com/2016/12/cox-proportional-hazards-model/
+covariates <- c("Tex", "oncotype",  clin_cols)
+univ_formulas <- sapply(covariates,
+                        function(x) as.formula(paste('Surv(ost, ose)~', x)))
+univ_models <- lapply(univ_formulas, function(x){coxph(x, data = tmp_df)})
+# Extract data 
+univ_results <- lapply(univ_models,
+                       function(x){ 
+                         x <- summary(x)
+                         p.value<-signif(x$logtest["pvalue"], digits=2)
+                         logrank.test<-signif(x$logtest["test"], digits=2)
+                         beta<-signif(x$coef[1,1], digits=2);#coeficient beta
+                         HR <-signif(x$coef[1,2], digits=2);#exp(beta)
+                         HR.confint.lower <- signif(x$conf.int[1,"lower .95"], 2)
+                         HR.confint.upper <- signif(x$conf.int[1,"upper .95"],2)
+                         names <- rownames(x$coef)[1]
+                         res<-c(beta, HR, HR.confint.lower,HR.confint.upper, logrank.test, p.value, names)
+                         names(res)<-c("beta", "HR", "HRL", "HRU", "logrank", "p.value", "sig")
+                         return(res)
+                         #return(exp(cbind(coef(x),confint(x))))
+                       })
+res <- as.data.frame(t(as.data.frame(univ_results, check.names = FALSE)))
+res$HR <- as.numeric(as.character(res$HR))
+res$HRL <- as.numeric(as.character(res$HRL))
+res$HRU <- as.numeric(as.character(res$HRU))
+# res$sig <- c('Tex', 'OncotypeDX', clin_cols)
+res$p_format <- str_c('p-val = ', res$p.value)
+
+form_gg <- ggplot(res, aes(x = HR, y = sig)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = HRL, xmax = HRU), width = 0.2) +
+  geom_vline(xintercept = 1, linetype = 'dashed', color = 'red') +
+  geom_text(aes(label = p_format), hjust = -1, vjust = -1.5) +
+  scale_x_continuous(trans = log2_trans(),
+                     breaks = trans_breaks("log2", function(x) 2^x),
+                     labels = trans_format("log2", math_format(2^.x))) +
+  labs(x = 'Hazard ratio (univariant tests, overall survival)', y = 'Variables', title = plot_title) +
+  theme_classic()
+ggsave(paste(plot_pf, 'univ_os_hr.png', sep = '_'), form_gg, dpi = 600, width = 9, height = 4.5)
+
+covariates <- c("Tex", "oncotype",  clin_cols)
+univ_formulas <- sapply(covariates,
+                        function(x) as.formula(paste('Surv(rfst, rfse)~', x)))
+univ_models <- lapply(univ_formulas, function(x){coxph(x, data = tmp_df)})
+# Extract data 
+univ_results <- lapply(univ_models,
+                       function(x){ 
+                         x <- summary(x)
+                         p.value<-signif(x$logtest["pvalue"], digits=2)
+                         logrank.test<-signif(x$logtest["test"], digits=2)
+                         beta<-signif(x$coef[1,1], digits=2);#coeficient beta
+                         HR <-signif(x$coef[1,2], digits=2);#exp(beta)
+                         HR.confint.lower <- signif(x$conf.int[1,"lower .95"], 2)
+                         HR.confint.upper <- signif(x$conf.int[1,"upper .95"],2)
+                         names <- rownames(x$coef)[1]
+                         res<-c(beta, HR, HR.confint.lower,HR.confint.upper, logrank.test, p.value, names)
+                         names(res)<-c("beta", "HR", "HRL", "HRU", "logrank", "p.value", "sig")
+                         return(res)
+                         #return(exp(cbind(coef(x),confint(x))))
+                       })
+res <- as.data.frame(t(as.data.frame(univ_results, check.names = FALSE)))
+res$HR <- as.numeric(as.character(res$HR))
+res$HRL <- as.numeric(as.character(res$HRL))
+res$HRU <- as.numeric(as.character(res$HRU))
+# res$sig <- c('Tex', 'OncotypeDX', clin_cols)
+res$p_format <- str_c('p-val = ', res$p.value)
+
+form_gg <- ggplot(res, aes(x = HR, y = sig)) +
+  geom_point() +
+  geom_errorbar(aes(xmin = HRL, xmax = HRU), width = 0.2) +
+  geom_vline(xintercept = 1, linetype = 'dashed', color = 'red') +
+  geom_text(aes(label = p_format), hjust = -1, vjust = -1.5) +
+  scale_x_continuous(trans = log2_trans(),
+                     breaks = trans_breaks("log2", function(x) 2^x),
+                     labels = trans_format("log2", math_format(2^.x))) +
+  labs(x = 'Hazard ratio (univariant tests, relapse-free survival)', y = 'Variables', title = plot_title) +
+  theme_classic()
+ggsave(paste(plot_pf, 'univ_rfs_hr.png', sep = '_'), form_gg, dpi = 600, width = 9, height = 4.5)
+
+cat('\t\tTex\n')
+fit <- survfit(Surv(ost, ose) ~ group_tex, data = tmp_df)
+surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'))
+png(paste(plot_pf, 'os_tex_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = tmp_df)
+surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'))
+png(paste(plot_pf, 'rfs_tex_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+cat('\t\tTex high: Chemo\n')
+tmp_hi_df <- tmp_df[tmp_df$group_tex == 'High',]
+fit <- survfit(Surv(ost, ose) ~ Chemotherapy, data = tmp_hi_df)
+surv_gg <- ggsurvplot(fit, data = tmp_hi_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Chemotherapy')
+png(paste(plot_pf, 'os_chemo_texhi_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ Chemotherapy, data = tmp_hi_df)
+surv_gg <- ggsurvplot(fit, data = tmp_hi_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Chemotherapy')
+png(paste(plot_pf, 'rfs_chemo_texhi_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+cat('\t\tTex int/low: Chemo\n')
+tmp_lo_df <- all_tmp_df[all_tmp_df$group_tex != 'High',]
+fit <- survfit(Surv(ost, ose) ~ Chemotherapy, data = tmp_lo_df)
+surv_gg <- ggsurvplot(fit, data = tmp_lo_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Chemotherapy')
+png(paste(plot_pf, 'os_chemo_tex_lo_int_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ Chemotherapy, data = tmp_lo_df)
+surv_gg <- ggsurvplot(fit, data = tmp_lo_df, pval = TRUE,
+                      title = plot_title,
+                      legend.title = 'Chemotherapy')
+png(paste(plot_pf, 'rfs_chemo_tex_lo_int_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+stop("TEST")
+#############################
+
+
+
+
+
+cat('Hazard ratio...\n')
+fit <- coxph(Surv(ost, ose) ~ menopausal_State + Tex + oncotype, data = df)
+forest_gg <- ggforest(fit)
+ggsave(paste(data_dir, 'all_together_os_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 4)
+
+fit <- coxph(Surv(rfst, rfse) ~ menopausal_State + Tex + oncotype, data = df)
+forest_gg <- ggforest(fit)
+ggsave(paste(data_dir, 'all_together_rfs_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 4)
+stop("TEST")
 
 pre_df <- df[df$menopausal_State == 'pre',]
 post_df <- df[df$menopausal_State == 'post',]
@@ -33,8 +266,6 @@ ggsave(paste(data_dir, 'all_together_os_hr.png', sep = ''), forest_gg, dpi = 600
 fit <- coxph(Surv(rfst, rfse) ~ menopausal_State + Tex + oncotype, data = df)
 forest_gg <- ggforest(fit)
 ggsave(paste(data_dir, 'all_together_rfs_hr.png', sep = ''), forest_gg, dpi = 600, width = 6, height = 4)
-
-
 
 use_df <- df
 meno_state <- 'all80'
@@ -67,6 +298,7 @@ png(paste(data_dir, meno_state, '_rfs_tex_oncomedium.png', sep = ''), res = 600,
 print(surv_gg)
 gar <- dev.off()
 stop("TEST")
+##########################################################
 
 use_df$hhll <- str_c('Tex:', use_df$group_tex, '-Oncotype:', use_df$group_onco)
 
