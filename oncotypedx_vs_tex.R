@@ -17,7 +17,7 @@ suppressMessages(library(rstatix))
 
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
-meno_status <- 'post'
+meno_status <- 'all'
 onco_status <- 'low-int'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
 
@@ -39,7 +39,7 @@ onco_comp_sct <- ggscatter(df, x = 'oncotype_unscale', y = 'oncotype_scale',
   geom_vline(xintercept = quantile(df$oncotype_unscale, c(0.15, 0.85))) +
   geom_hline(yintercept = c(11,25), color = 'red') +
   geom_hline(yintercept = quantile(df$oncotype_scale, c(0.15, 0.85)))
-plot_pf <- paste(data_dir, 'final_03062021', sep = '')
+plot_pf <- paste(data_dir, 'final_03112021', sep = '')
 ggsave(paste(plot_pf, 'oncotype_compare_scatter.png', sep = ''), onco_comp_sct,
        dpi = 600, width = 6, height = 6)
 
@@ -60,6 +60,20 @@ ggsave(paste(plot_pf, 'oncotype_compare_histogram.png', sep = ''), onco_comp_his
        dpi = 600, width = 6, height = 6)
 
 plot_pf <- paste(plot_pf, bc_type, meno_status, 'onco', onco_status, sep = '_')
+
+if (meno_status == 'all') {
+
+  cat('INDEPENDENT!!!\n')
+  fit <- coxph(Surv(ost, ose) ~ menopausal_State+grade+tsize+oncotype+Tex, 
+               data = df)
+  forest_gg <- ggforest(fit)
+  ggsave(paste(plot_pf, 'multiv_all_tex_onco_meno_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+  
+  fit <- coxph(Surv(rfst, rfse) ~ menopausal_State+grade+tsize+oncotype+Tex, 
+               data = df)
+  forest_gg <- ggforest(fit)
+  ggsave(paste(plot_pf, 'multiv_all_tex_onco_meno_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+}
 if (meno_status == 'pre') {
   use_df <- df[df$menopausal_State == 'pre',]
 } else if (meno_status == 'post') {
@@ -149,6 +163,32 @@ onco_tex_sub <- ggscatter(all_tmp_df, x = 'Tex', y = 'oncotype', color = 'group_
 ggsave(paste(plot_pf, '_oncotype_tex_corr.png', sep = ''), onco_tex_sub,
        dpi = 600, width = 6, height = 6)
 
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(ost, ose) ~ oncotype+Tex, 
+             data = all_tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_sub_tex_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(rfst, rfse) ~ oncotype+Tex, 
+             data = all_tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_sub_tex_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+
+cat('Hazard ratio -- Multivariant -- ALL\n')
+fit <- coxph(Surv(ost, ose) ~ age+grade+tsize+oncotype+Tex,
+             data = all_tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_all_tex_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant -- ALL\n')
+fit <- coxph(Surv(rfst, rfse) ~ age+grade+tsize+oncotype+Tex, 
+             data = all_tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_all_tex_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+
 tmp_df <- tmp_df[tmp_df$group_tex != 'Medium',]
 onco_tex_box <- ggplot(tmp_df, aes(x = group_tex, y = oncotype, color = group_tex)) +
   geom_boxplot() +
@@ -159,6 +199,33 @@ onco_tex_box <- ggplot(tmp_df, aes(x = group_tex, y = oncotype, color = group_te
   theme(axis.title.x = element_blank())
 ggsave(paste(plot_pf, '_oncotype_tex_comp.png', sep = ''), onco_tex_box,
        dpi = 600, width = 4.5, height = 3)
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(ost, ose) ~ Tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_tex_noint_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(rfst, rfse) ~ Tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_tex_noint_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(ost, ose) ~ group_tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_tex_group_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant...\n')
+fit <- coxph(Surv(rfst, rfse) ~ group_tex+oncotype, 
+             data = tmp_df)
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, 'multiv_tex_group_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+stop("TEST")
+
 
 cat('Hazard ratio -- Multivariant...\n')
 fit <- coxph(Surv(ost, ose) ~ Age.at.Diagnosis+Tumor.Size+Tumor.Stage+Neoplasm.Histologic.Grade+Tex, 
