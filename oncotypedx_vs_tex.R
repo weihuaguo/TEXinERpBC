@@ -18,8 +18,9 @@ suppressMessages(library(rstatix))
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
 meno_status <- 'all'
-onco_status <- 'low-int'
+onco_status <- 'int'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
+plot_pf <- paste(data_dir, 'final_03152021', sep = '')
 
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
@@ -39,7 +40,7 @@ onco_comp_sct <- ggscatter(df, x = 'oncotype_unscale', y = 'oncotype_scale',
   geom_vline(xintercept = quantile(df$oncotype_unscale, c(0.15, 0.85))) +
   geom_hline(yintercept = c(11,25), color = 'red') +
   geom_hline(yintercept = quantile(df$oncotype_scale, c(0.15, 0.85)))
-plot_pf <- paste(data_dir, 'final_03112021', sep = '')
+
 ggsave(paste(plot_pf, 'oncotype_compare_scatter.png', sep = ''), onco_comp_sct,
        dpi = 600, width = 6, height = 6)
 
@@ -166,12 +167,18 @@ ggsave(paste(plot_pf, '_oncotype_tex_corr.png', sep = ''), onco_tex_sub,
 cat('Hazard ratio -- Multivariant...\n')
 fit <- coxph(Surv(ost, ose) ~ oncotype+Tex, 
              data = all_tmp_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, 'multiv_sub_tex_onco_os.csv', sep = '_'))
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, 'multiv_sub_tex_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
 cat('Hazard ratio -- Multivariant...\n')
 fit <- coxph(Surv(rfst, rfse) ~ oncotype+Tex, 
              data = all_tmp_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, 'multiv_sub_tex_onco_rfs.csv', sep = '_'))
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, 'multiv_sub_tex_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
@@ -179,12 +186,18 @@ ggsave(paste(plot_pf, 'multiv_sub_tex_onco_rfs.png', sep = '_'), forest_gg, dpi 
 cat('Hazard ratio -- Multivariant -- ALL\n')
 fit <- coxph(Surv(ost, ose) ~ age+grade+tsize+oncotype+Tex,
              data = all_tmp_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, 'multiv_all_tex_onco_os.csv', sep = '_'))
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, 'multiv_all_tex_onco_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
 cat('Hazard ratio -- Multivariant -- ALL\n')
 fit <- coxph(Surv(rfst, rfse) ~ age+grade+tsize+oncotype+Tex, 
              data = all_tmp_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, 'multiv_all_tex_onco_rfs.csv', sep = '_'))
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, 'multiv_all_tex_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
@@ -223,8 +236,6 @@ fit <- coxph(Surv(rfst, rfse) ~ group_tex+oncotype,
              data = tmp_df)
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, 'multiv_tex_group_onco_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
-
-stop("TEST")
 
 
 cat('Hazard ratio -- Multivariant...\n')
@@ -278,6 +289,7 @@ form_gg <- ggplot(res, aes(x = HR, y = sig)) +
   labs(x = 'Hazard ratio (univariant tests, overall survival)', y = 'Variables', title = plot_title) +
   theme_classic()
 ggsave(paste(plot_pf, 'univ_os_hr.png', sep = '_'), form_gg, dpi = 600, width = 9, height = 4.5)
+write.csv(res, paste(plot_pf, 'univ_os_hr.csv', sep = '_'))
 
 covariates <- c("Tex", "Age.at.Diagnosis", "Tumor.Size", "Tumor.Stage", "Neoplasm.Histologic.Grade")
 univ_formulas <- sapply(covariates,
@@ -317,6 +329,8 @@ form_gg <- ggplot(res, aes(x = HR, y = sig)) +
   labs(x = 'Hazard ratio (univariant tests, relapse-free survival)', y = 'Variables', title = plot_title) +
   theme_classic()
 ggsave(paste(plot_pf, 'univ_rfs_hr.png', sep = '_'), form_gg, dpi = 600, width = 9, height = 4.5)
+write.csv(res, paste(plot_pf, 'univ_rfs_hr.csv', sep = '_'))
+stop("HERE")
 
 cat('\t\tTex\n')
 fit <- survfit(Surv(ost, ose) ~ group_tex, data = tmp_df)
