@@ -20,7 +20,7 @@ bc_type <- 'ER'
 meno_status <- 'all'
 onco_status <- 'int'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
-plot_pf <- paste(data_dir, 'final_03152021', sep = '')
+plot_pf <- paste(data_dir, 'final_05152021', sep = '')
 
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
@@ -31,6 +31,32 @@ df$oncotype_scale <- latest_onco[rownames(df),'sigscore']
 clinical_df <- read.csv(paste(data_dir, 'brca_metabric_clinical_data.csv', sep = ''), header = T, row.names = 1,
                           check.names = T)
 rownames(clinical_df) <- str_replace(rownames(clinical_df), '-', '.')
+
+cat("Compare oncotype Dx and Tex...\n")
+all_tex_oncodx <- ggscatter(df, x = 'oncotype_unscale', y = 'Tex', size = 1,
+                            add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                            conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = 'All the samples')
+ggsave(paste(plot_pf, 'oncotype_tex_scatter.png', sep = ''), all_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
+pre_tex_oncodx <- ggscatter(df[df$menopausal_State=='pre',], x = 'oncotype_unscale', y = 'Tex', size = 1,
+                            add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                            conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = "Pre-menopause")
+ggsave(paste(plot_pf, 'oncotype_tex_scatter_pre.png', sep = ''), pre_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
+post_tex_oncodx <- ggscatter(df[df$menopausal_State=='post',], x = 'oncotype_unscale', y = 'Tex', size = 1,
+                            add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                            conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = "Post-menopause")
+ggsave(paste(plot_pf, 'oncotype_tex_scatter_post.png', sep = ''), post_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
 
 cat("Compare the actual and in-house oncotype Dx...\n")
 onco_comp_sct <- ggscatter(df, x = 'oncotype_unscale', y = 'oncotype_scale',
@@ -63,7 +89,6 @@ ggsave(paste(plot_pf, 'oncotype_compare_histogram.png', sep = ''), onco_comp_his
 plot_pf <- paste(plot_pf, bc_type, meno_status, 'onco', onco_status, sep = '_')
 
 if (meno_status == 'all') {
-
   cat('INDEPENDENT!!!\n')
   fit <- coxph(Surv(ost, ose) ~ menopausal_State+grade+tsize+oncotype+Tex, 
                data = df)
@@ -85,6 +110,9 @@ use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.85), '
                             ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
 use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
                            ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
+
+write.csv(use_df, paste(plot_pf, 'organized_df.csv', sep = ''))
+stop("TEST")
 
 cat("\tThree group comparison...\n")
 m_use_df <- use_df
