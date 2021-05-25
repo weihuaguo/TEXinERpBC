@@ -17,10 +17,10 @@ suppressMessages(library(rstatix))
 
 data_dir <- 'C:/Users/wguo/OneDrive - City of Hope National Medical Center/tmp_works/oncotype_dx_pre_vs_post/'
 bc_type <- 'ER'
-meno_status <- 'all'
+meno_status <- 'post'
 onco_status <- 'int'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
-plot_pf <- paste(data_dir, 'final_05152021', sep = '')
+plot_pf <- paste(data_dir, 'final_05242021_', sep = '')
 
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
@@ -31,6 +31,76 @@ df$oncotype_scale <- latest_onco[rownames(df),'sigscore']
 clinical_df <- read.csv(paste(data_dir, 'brca_metabric_clinical_data.csv', sep = ''), header = T, row.names = 1,
                           check.names = T)
 rownames(clinical_df) <- str_replace(rownames(clinical_df), '-', '.')
+
+cat("Oncotype Dx Int high is not Tex high...\n")
+use_df <- df[df$menopausal_State == "post",]
+subset_name <- "Post"
+use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.85), 'High', 
+                            ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
+use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
+                           ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
+use_df <- use_df[use_df$group_tex != 'Medium',]
+use_df <- use_df[use_df$group_onco == 'Medium',]
+use_df$group_onco_int <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.50), 'Int-High', 'Int-Low')
+cat("\tFix Tex and compare oncotype Dx...\n")
+ftco_gg <- ggplot(use_df, aes_string(x='group_tex', y='oncotype', color='group_tex')) +
+  geom_boxplot() +
+  geom_jitter(position=position_jitter(0.2)) +
+  stat_compare_means(method = 't.test', label.x = 1.3) +
+  labs(x = 'Tex group', y = 'Oncotype Dx score', color = 'Tex group', title = subset_name) +
+  theme_classic()
+ggsave(paste(plot_pf, subset_name, '_boxplot_fix_tex_compare_onco.png', sep = ''), ftco_gg,
+       dpi = 600, width = 3.6, height = 4.8)
+
+cat("\tFix Oncotype Dx and compare Tex...\n")
+ftco_gg <- ggplot(use_df, aes_string(x='group_onco_int', y='Tex', color='group_onco_int')) +
+  geom_boxplot() +
+  geom_jitter(position=position_jitter(0.2)) +
+  stat_compare_means(method = 't.test', label.x = 1.3) +
+  labs(x = 'Oncotype Dx Intermediate subgroups ', y = 'Tex', color = 'Subgroups', title = subset_name) +
+  theme_classic()
+ggsave(paste(plot_pf, subset_name, '_boxplot_fix_onco_compare_tex.png', sep = ''), ftco_gg,
+       dpi = 600, width = 3.6, height = 4.8)
+
+cat("\tCategorical comparison...\n")
+use_tbl <- as.data.frame(table(use_df$group_onco_int, use_df$group_tex))
+tbl_pval <- chisq.test(use_df$group_onco_int, use_df$group_tex)
+ftco_gg <- ggplot(use_tbl, aes_string(x='Var1', y='Freq', fill='Var2')) +
+  geom_bar(stat="identity") +
+  annotate("text", x=1.4, y=nrow(use_df)/2*1.1, 
+           label=sprintf("Chi-Square\np-value=%0.3f", tbl_pval$p.value))+
+  labs(x = 'Oncotype Dx Intermediate subgroups ', y = 'Patient number', fill = 'Tex groups', title = subset_name) +
+  theme_classic()
+ggsave(paste(plot_pf, subset_name, '_barplot_int_tex.png', sep = ''), ftco_gg,
+       dpi = 600, width = 3.6, height = 4.8)
+
+stop("TEST")
+
+all_tex_oncodx <- ggscatter(df, x = 'oncotype_unscale', y = 'Tex', size = 1,
+                            add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                            conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = 'All the samples')
+ggsave(paste(plot_pf, 'oncotype_tex_scatter.png', sep = ''), all_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
+pre_tex_oncodx <- ggscatter(df[df$menopausal_State=='pre',], x = 'oncotype_unscale', y = 'Tex', size = 1,
+                            add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                            conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = "Pre-menopause")
+ggsave(paste(plot_pf, 'oncotype_tex_scatter_pre.png', sep = ''), pre_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
+post_tex_oncodx <- ggscatter(df[df$menopausal_State=='post',], x = 'oncotype_unscale', y = 'Tex', size = 1,
+                             add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
+                             conf.int = TRUE) +
+  stat_cor(method = 'pearson') + 
+  labs(x = 'Oncotype Dx', y = 'Tex', title = "Post-menopause")
+ggsave(paste(plot_pf, 'oncotype_tex_scatter_post.png', sep = ''), post_tex_oncodx,
+       dpi = 600, width = 4.5, height = 4.8)
+
+stop("TEST")
 
 cat("Compare oncotype Dx and Tex...\n")
 all_tex_oncodx <- ggscatter(df, x = 'oncotype_unscale', y = 'Tex', size = 1,
@@ -88,6 +158,14 @@ ggsave(paste(plot_pf, 'oncotype_compare_histogram.png', sep = ''), onco_comp_his
 
 plot_pf <- paste(plot_pf, bc_type, meno_status, 'onco', onco_status, sep = '_')
 
+if (FALSE) {
+df$group_onco <- ifelse(df$oncotype > quantile(df$oncotype, 0.85), 'High', 
+                            ifelse(df$oncotype < quantile(df$oncotype, 0.15), 'Low', 'Medium'))
+df$group_tex <- ifelse(df$Tex > quantile(df$Tex, 0.75), 'High', 
+                           ifelse(df$Tex <= quantile(df$Tex, 0.75), 'Low', 'Medium'))
+df$group_tex <- ifelse(df$Tex > quantile(df$Tex, 0.50), 'High', 'Low')
+}
+
 if (meno_status == 'all') {
   cat('INDEPENDENT!!!\n')
   fit <- coxph(Surv(ost, ose) ~ menopausal_State+grade+tsize+oncotype+Tex, 
@@ -106,13 +184,14 @@ if (meno_status == 'pre') {
   use_df <- df[df$menopausal_State == 'post',]  
 } else {use_df <- df}
 
+if (TRUE) {
 use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.85), 'High', 
                             ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
-use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
-                           ifelse(use_df$Tex < quantile(use_df$Tex, 0.25), 'Low', 'Medium'))
-
+use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.70), 'High', 
+                           ifelse(use_df$Tex < quantile(use_df$Tex, 0.30), 'Low', 'Medium'))
+use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.50), 'High', 'Low')
 write.csv(use_df, paste(plot_pf, 'organized_df.csv', sep = ''))
-stop("TEST")
+}
 
 cat("\tThree group comparison...\n")
 m_use_df <- use_df
@@ -123,8 +202,8 @@ m_use_df <- m_use_df[!str_detect(m_use_df$group_final, 'Tex Medium'),]
 
 fit <- survfit(Surv(ost, ose) ~ group_final, data = m_use_df)
 surv_gg <- ggsurvplot(fit, data = m_use_df, pval = TRUE,
-                      title = paste('Menopause', meno_status), legend = 'right')
-png(paste(plot_pf, 'os_onco_medium_three_group.png', sep = '_'), res = 600, width = 9, height = 4, units = 'in')
+                      title = paste('Menopause', meno_status), legend = 'right', risk.table = TRUE)
+png(paste(plot_pf, 'os_onco_medium_three_group.png', sep = '_'), res = 600, width = 9, height = 7.5, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 ps_res <- pairwise_survdiff(Surv(ost, ose) ~ group_final, data = m_use_df)
@@ -132,8 +211,8 @@ write.csv(ps_res$p.value, paste(plot_pf, 'os_onco_medium_three_group_pairwise.cs
 
 fit <- survfit(Surv(rfst, rfse) ~ group_final, data = m_use_df)
 surv_gg <- ggsurvplot(fit, data = m_use_df, pval = TRUE,
-                      title = paste('Menopause', meno_status), legend = 'right')
-png(paste(plot_pf, 'rfs_onco_medium_three_group.png', sep = '_'), res = 600, width = 9, height = 4, units = 'in')
+                      title = paste('Menopause', meno_status), legend = 'right', risk.table = TRUE)
+png(paste(plot_pf, 'rfs_onco_medium_three_group.png', sep = '_'), res = 600, width = 9, height = 7.5, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 ps_res <- pairwise_survdiff(Surv(rfst, rfse) ~ group_final, data = m_use_df)
@@ -358,15 +437,15 @@ form_gg <- ggplot(res, aes(x = HR, y = sig)) +
   theme_classic()
 ggsave(paste(plot_pf, 'univ_rfs_hr.png', sep = '_'), form_gg, dpi = 600, width = 9, height = 4.5)
 write.csv(res, paste(plot_pf, 'univ_rfs_hr.csv', sep = '_'))
-stop("HERE")
 
 cat('\t\tTex\n')
 fit <- survfit(Surv(ost, ose) ~ group_tex, data = tmp_df)
 surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
                       title = plot_title,
                       legend.title = 'Tex',
-                      legend.labs = c('High', 'Low'))
-png(paste(plot_pf, 'os_tex_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, 'os_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 
@@ -374,8 +453,9 @@ fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = tmp_df)
 surv_gg <- ggsurvplot(fit, data = tmp_df, pval = TRUE,
                       title = plot_title,
                       legend.title = 'Tex',
-                      legend.labs = c('High', 'Low'))
-png(paste(plot_pf, 'rfs_tex_km.png', sep = '_'), res = 600, width = 6, height = 4, units = 'in')
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, 'rfs_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
 print(surv_gg)
 gar <- dev.off()
 
