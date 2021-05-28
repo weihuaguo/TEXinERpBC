@@ -20,7 +20,7 @@ bc_type <- 'ER'
 meno_status <- 'post'
 onco_status <- 'int'
 plot_title <- paste('Menopause', meno_status, '- Oncotype Dx', onco_status)
-plot_pf <- paste(data_dir, 'final_05242021_', sep = '')
+plot_pf <- paste(data_dir, 'final_05272021_', sep = '')
 
 df <- read.csv(paste(data_dir, 'metabric_', bc_type, '_tex_oncotype_sigscore.csv', sep = ''), row.names = 1)
 
@@ -33,8 +33,8 @@ clinical_df <- read.csv(paste(data_dir, 'brca_metabric_clinical_data.csv', sep =
 rownames(clinical_df) <- str_replace(rownames(clinical_df), '-', '.')
 
 cat("Oncotype Dx Int high is not Tex high...\n")
-use_df <- df[df$menopausal_State == "post",]
-subset_name <- "Post"
+use_df <- df#[df$menopausal_State == "post",]
+subset_name <- "All"
 use_df$group_onco <- ifelse(use_df$oncotype > quantile(use_df$oncotype, 0.85), 'High', 
                             ifelse(use_df$oncotype < quantile(use_df$oncotype, 0.15), 'Low', 'Medium'))
 use_df$group_tex <- ifelse(use_df$Tex > quantile(use_df$Tex, 0.75), 'High', 
@@ -73,6 +73,86 @@ ftco_gg <- ggplot(use_tbl, aes_string(x='Var1', y='Freq', fill='Var2')) +
   theme_classic()
 ggsave(paste(plot_pf, subset_name, '_barplot_int_tex.png', sep = ''), ftco_gg,
        dpi = 600, width = 3.6, height = 4.8)
+
+cat('\t\tTex\n')
+ih_df <- use_df[use_df$group_onco_int == 'Int-High',]
+fit <- survfit(Surv(ost, ose) ~ group_tex, data = ih_df)
+surv_gg <- ggsurvplot(fit, data = ih_df, pval = TRUE,
+                      title = paste(subset_name, "- Oncotype Intermediate High (OS)"),
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, subset_name, '_ih_os_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = ih_df)
+surv_gg <- ggsurvplot(fit, data = ih_df, pval = TRUE,
+                      title = paste(subset_name, "- Oncotype Intermediate High (RFS)"),
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, subset_name, '_ih_rfs_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+cat('Hazard ratio -- Multivariant -- OncoIH\n')
+fit <- coxph(Surv(ost, ose) ~ age+grade+tsize+Tex,
+             data = ih_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, subset_name, '_multiv_tex_onco_ih_os.csv', sep = '_'))
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, subset_name, '_multiv_tex_onco_ih_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant -- OncoIH\n')
+fit <- coxph(Surv(rfst, rfse) ~ age+grade+tsize+Tex,
+             data = ih_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, subset_name, '_multiv_tex_onco_ih_rfs.csv', sep = '_'))
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, subset_name, '_multiv_tex_onco_ih_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+
+ih_df <- use_df[use_df$group_onco_int == 'Int-Low',]
+fit <- survfit(Surv(ost, ose) ~ group_tex, data = ih_df)
+surv_gg <- ggsurvplot(fit, data = ih_df, pval = TRUE,
+                      title = paste(subset_name, "- Oncotype Intermediate Low (OS)"),
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, subset_name, '_il_os_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+fit <- survfit(Surv(rfst, rfse) ~ group_tex, data = ih_df)
+surv_gg <- ggsurvplot(fit, data = ih_df, pval = TRUE,
+                      title = paste(subset_name, "- Oncotype Intermediate Low (RFS)"),
+                      legend.title = 'Tex',
+                      legend.labs = c('High', 'Low'),
+                      risk.table = TRUE)
+png(paste(plot_pf, subset_name, '_il_rfs_tex_km.png', sep = '_'), res = 600, width = 6, height = 6, units = 'in')
+print(surv_gg)
+gar <- dev.off()
+
+cat('Hazard ratio -- Multivariant -- OncoIL\n')
+fit <- coxph(Surv(ost, ose) ~ age+grade+tsize+Tex,
+             data = ih_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, subset_name, '_multiv_tex_onco_il_os.csv', sep = '_'))
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, subset_name, '_multiv_tex_onco_il_os.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
+
+cat('Hazard ratio -- Multivariant -- OncoIL\n')
+fit <- coxph(Surv(rfst, rfse) ~ age+grade+tsize+Tex,
+             data = ih_df)
+sum_fit <- summary(fit)
+sum_fit_df <- cbind(sum_fit$coefficients, sum_fit$conf.int)
+write.csv(sum_fit_df, paste(plot_pf, subset_name, '_multiv_tex_onco_il_rfs.csv', sep = '_'))
+forest_gg <- ggforest(fit)
+ggsave(paste(plot_pf, subset_name, '_multiv_tex_onco_il_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
 stop("TEST")
 
