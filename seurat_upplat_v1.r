@@ -403,9 +403,6 @@ if (func_switch == 2) {
 	sc_cts_df <- as.matrix(table(srsc@meta.data$seurat_clusters, srsc@meta.data$patient))
 	write.csv(sc_cts_df, paste(c(res_dir, sample_id, "cell_counts_seurat_cluster.csv"),collapse=""))
 
-	q(save = "no")
-
-
 	## Output scaled expression for GSEA analysis
 	scaleData <- as.data.frame(as.matrix(srsc[["RNA"]]@scale.data))
 	metaData <- srsc@meta.data
