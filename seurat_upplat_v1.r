@@ -12,6 +12,7 @@ library(Seurat)
 library(tcltk)
 library(ggplot2)
 library(stringr)
+library(RColorBrewer)
 
 exp_id <- "tex_brtissue_scim_k5_res50_pptest" # Experimental ID, a new folder with this name will be created
 sample_id <- exp_id
@@ -362,6 +363,49 @@ if (func_switch == 2) {
 	srsc@meta.data[srsc@meta.data$seurat_clusters == 3, "cell_annot"] <- "Central Memory T cells"
 	srsc@meta.data[srsc@meta.data$seurat_clusters == 2, "cell_annot"] <- "Exhausted T cells"
 
+	# batch effect check Fig S1
+	bePlot <- DimPlot(srsc, reduction = "tsne", group.by = c("tissue"))
+	ggsave(plot = bePlot, 
+	       filename = paste(c(res_dir, sample_id, "_tissue_", "batch_effect_check.png"),collapse=""), 
+	       width = 6, height = 4, dpi = 600)
+	
+	set.seed(696969)
+	palette2_all <- grDevices::colors()  
+	palette2_no_gray <- palette2_all[grep("gr(a|e)y", grDevices::colors(), invert = T)]
+	plate_col <- sample(palette2_no_gray, length(unique(srsc@meta.data$plate)))  
+	bePlot <- DimPlot(srsc, reduction = "tsne", group.by = c("plate"), cols = plate_col)
+	ggsave(plot = bePlot, 
+	       filename = paste(c(res_dir, sample_id, "_plate_", "batch_effect_check.png"),collapse=""), 
+	       width = 6, height = 6, dpi = 600)
+
+	pat_col <- brewer.pal(length(unique(srsc@meta.data$patient)), "Paired")
+	bePlot <- DimPlot(srsc, reduction = "tsne", group.by = c("patient"), cols = pat_col)
+	ggsave(plot = bePlot, 
+	       filename = paste(c(res_dir, sample_id, "_patient_", "batch_effect_check.png"),collapse=""), 
+	       width = 6, height = 4, dpi = 600)
+
+	pat_col <- brewer.pal(length(unique(srsc@meta.data$patient)), "Paired")
+	bePlot <- DimPlot(srsc, reduction = "tsne", group.by = c("patient"), cols = pat_col, 
+			  split.by = c("cell_annot"), ncol = 2)
+	ggsave(plot = bePlot, 
+	       filename = paste(c(res_dir, sample_id, "_patient_split_batch_effect_check.png"),collapse=""), 
+	       width = 9, height = 6, dpi = 600)
+
+	cell_cts_df <- srsc@meta.data %>% 
+		group_by(patient, cell_annot) %>% 
+		summarise(n = n()) %>%
+		group_by(patient) %>%
+		mutate(pat_sum = sum(n))
+
+	ca_cts_df <- as.matrix(table(srsc@meta.data$cell_annot, srsc@meta.data$patient))
+	write.csv(ca_cts_df, paste(c(res_dir, sample_id, "cell_counts_cell_annot.csv"),collapse=""))
+
+	sc_cts_df <- as.matrix(table(srsc@meta.data$seurat_clusters, srsc@meta.data$patient))
+	write.csv(sc_cts_df, paste(c(res_dir, sample_id, "cell_counts_seurat_cluster.csv"),collapse=""))
+
+	q(save = "no")
+
+
 	## Output scaled expression for GSEA analysis
 	scaleData <- as.data.frame(as.matrix(srsc[["RNA"]]@scale.data))
 	metaData <- srsc@meta.data
@@ -371,7 +415,7 @@ if (func_switch == 2) {
 	## Plots
 	# batch effect check Fig S1
 	bePlot <- DimPlot(srsc, reduction = "tsne", group.by = c("tissue", "plate", "patient"), ncol = 1)
-	ggsave(plot = bePlot, filename = paste(res_dir, sample_id, "_clean_batch_effect_check.tiff", sep = ""), 
+	ggsave(plot = bePlot, filename = paste(res_dir, sample_id, "_clean_batch_effect_check.tiff", sep = ""),
 	       width = 6, height = 12, dpi = tifres)
 
 	# Check the T cell marker expression on the minor clusters Fig S3
