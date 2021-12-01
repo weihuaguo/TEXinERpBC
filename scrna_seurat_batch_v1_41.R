@@ -800,6 +800,10 @@ if (geneDEFlag) {
 	}
 
 	proObj <- subset(proObj, subset = patient == "BC394", invert = TRUE)
+	print(proObj)
+	write.csv(proObj@meta.data, paste(intePf, "meta_data.csv", sep = ""))
+	write.csv(as.matrix(proObj@assays$RNA@counts), paste(intePf, "raw_counts.csv", sep = ""))
+	q(save = "no")
 
 	ifnrs <- c("IFNAR1", "IFNAR2", "IFNGR1", "IFNGR2")
 	ifnrGG <- FeaturePlot(proObj, features = ifnrs, split.by = "TEX", order = TRUE)
