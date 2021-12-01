@@ -154,12 +154,10 @@ write.csv(sum_fit_df, paste(plot_pf, subset_name, '_multiv_tex_onco_il_rfs.csv',
 forest_gg <- ggforest(fit)
 ggsave(paste(plot_pf, subset_name, '_multiv_tex_onco_il_rfs.png', sep = '_'), forest_gg, dpi = 600, width = 6, height = 4)
 
-stop("TEST")
-
 all_tex_oncodx <- ggscatter(df, x = 'oncotype_unscale', y = 'Tex', size = 1,
                             add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
                             conf.int = TRUE) +
-  stat_cor(method = 'pearson') + 
+  stat_cor(method = 'spearman') + 
   labs(x = 'Oncotype Dx', y = 'Tex', title = 'All the samples')
 ggsave(paste(plot_pf, 'oncotype_tex_scatter.png', sep = ''), all_tex_oncodx,
        dpi = 600, width = 4.5, height = 4.8)
@@ -167,7 +165,7 @@ ggsave(paste(plot_pf, 'oncotype_tex_scatter.png', sep = ''), all_tex_oncodx,
 pre_tex_oncodx <- ggscatter(df[df$menopausal_State=='pre',], x = 'oncotype_unscale', y = 'Tex', size = 1,
                             add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
                             conf.int = TRUE) +
-  stat_cor(method = 'pearson') + 
+  stat_cor(method = 'spearman') + 
   labs(x = 'Oncotype Dx', y = 'Tex', title = "Pre-menopause")
 ggsave(paste(plot_pf, 'oncotype_tex_scatter_pre.png', sep = ''), pre_tex_oncodx,
        dpi = 600, width = 4.5, height = 4.8)
@@ -175,7 +173,7 @@ ggsave(paste(plot_pf, 'oncotype_tex_scatter_pre.png', sep = ''), pre_tex_oncodx,
 post_tex_oncodx <- ggscatter(df[df$menopausal_State=='post',], x = 'oncotype_unscale', y = 'Tex', size = 1,
                              add = 'reg.line', add.params = list(color = 'blue', fill = 'lightgray'),
                              conf.int = TRUE) +
-  stat_cor(method = 'pearson') + 
+  stat_cor(method = 'spearman') + 
   labs(x = 'Oncotype Dx', y = 'Tex', title = "Post-menopause")
 ggsave(paste(plot_pf, 'oncotype_tex_scatter_post.png', sep = ''), post_tex_oncodx,
        dpi = 600, width = 4.5, height = 4.8)
